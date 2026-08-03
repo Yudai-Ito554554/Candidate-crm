@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs and coverage
+*.log
+coverage/
+
+# TypeScript and tooling caches
+*.tsbuildinfo
+.eslintcache
+
+# Tauri generated files
+src-tauri/gen/
