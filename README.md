@@ -1,6 +1,6 @@
 # Candidate CRM
 
-転職エージェント向け候補者 CRM のデスクトップアプリです。macOS と Windows の双方で開発できる基盤に加え、Phase 3では候補者中心の業務UIを維持したまま、Supabase認証と組織単位のデータモデルを導入しています。
+転職エージェント向け候補者 CRM のデスクトップアプリです。macOS と Windows の双方で開発できる基盤に加え、Phase 3Aでは候補者中心の業務UIを維持したままSupabase認証を導入しています。
 
 ## 技術スタック
 
@@ -26,7 +26,7 @@ Tauri の prerequisites は[公式ドキュメント](https://v2.tauri.app/start
 npm install
 ```
 
-`.env.example` を `.env` にコピーし、SupabaseのProject URLとPublishable keyを設定すると認証モードになります。未設定の場合は従来どおり型付き仮データモードで起動します。
+`.env.example` を `.env` にコピーし、SupabaseのProject URLとPublishable keyを設定してください。不足または形式不正の場合は、CRM画面の代わりに設定エラー画面を表示します。
 
 ```sh
 cp .env.example .env
@@ -78,17 +78,17 @@ npm run tauri build
 
 データは `src/data/mock-data.ts` と `src/data/workspace-data.ts` の型付き仮データです。パイプラインの変更は画面内だけで保持され、再読み込みすると元に戻ります。未実装操作は画面上で「次の Phase で実装予定」と案内します。
 
-## Phase 3 のSupabase基盤
+## Phase 3A のSupabase認証
 
 - メールアドレス・パスワード認証とセッション復元
-- 未設定時に仮データモードへフォールバック
-- 組織、ユーザー、企業、候補者、求人、選考、タスク、タイムライン、Inbox、AI分析の初期スキーマ
-- 全業務テーブルのRow Level Security
-- 組織をまたぐ参照を防ぐ複合外部キー
-- 型付きSupabaseクライアントとデータ取得リポジトリ
+- 未ログイン時のCRMルート保護
+- 現在端末からのログアウト
+- ログアウト時のTanStack Queryキャッシュ破棄
+- 環境変数のZod検証と日本語設定エラー
+- 認証エラーの日本語表示
 
-ローカルDBの起動・migration適用方法は`supabase/README.md`を参照してください。実プロジェクトへ接続するまでは画面データ自体は既存の仮データを使用します。
+画面データ自体は既存のTypeScript仮データを引き続き使用します。
 
 ## 現在の範囲外
 
-実データへの画面切替、初期データ移行、ユーザー招待、パスワード再設定、ファイルアップロード、メール・AI連携、編集・新規登録フォームの保存は未実装です。
+データベースmigration、profilesテーブル、候補者データのSupabase取得、新規登録、ユーザー招待、パスワード再設定、Googleログイン、ファイル・メール・AI連携は未実装です。

@@ -19,7 +19,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { PlannedButton } from "@/components/common/planned-button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/contexts/use-auth";
+import { useAuth } from "@/features/auth/use-auth";
 import { currentUser } from "@/data/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -52,10 +52,7 @@ export function AppLayout() {
     () => getPageTitle(location.pathname),
     [location.pathname],
   );
-  const userLabel =
-    (typeof auth.user?.user_metadata.full_name === "string"
-      ? auth.user.user_metadata.full_name
-      : auth.user?.email) ?? currentUser;
+  const userLabel = auth.user?.email ?? currentUser;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -153,17 +150,15 @@ export function AppLayout() {
             <span className="whitespace-nowrap text-sm font-medium">
               {userLabel}
             </span>
-            {auth.isConfigured ? (
-              <button
-                aria-label="ログアウト"
-                className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                onClick={() => void auth.signOut()}
-                title="ログアウト"
-                type="button"
-              >
-                <LogOut className="size-4" />
-              </button>
-            ) : null}
+            <button
+              aria-label="ログアウト"
+              className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => void auth.signOut()}
+              title="ログアウト"
+              type="button"
+            >
+              <LogOut className="size-4" />
+            </button>
           </div>
         </header>
         <main className="min-w-0 p-5">

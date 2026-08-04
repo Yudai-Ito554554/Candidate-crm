@@ -1,31 +1,83 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import type { Session } from "@supabase/supabase-js";
 
-import { AuthProvider } from "@/contexts/auth-context";
+import { AuthProvider } from "@/features/auth/auth-provider";
 import { appRoutes } from "@/router";
+
+const authMocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  onAuthStateChange: vi.fn(),
+  signInWithPassword: vi.fn(),
+  signOut: vi.fn(),
+  unsubscribe: vi.fn(),
+}));
+
+vi.mock("@/lib/env", () => ({
+  environment: {
+    success: true,
+    data: {
+      VITE_SUPABASE_URL: "https://example.supabase.co",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
+    },
+  },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getSupabaseClient: vi.fn(() => Promise.resolve({ auth: authMocks })),
+}));
+
+const authenticatedSession = {
+  access_token: "test-access-token",
+  refresh_token: "test-refresh-token",
+  expires_in: 3600,
+  token_type: "bearer",
+  user: {
+    id: "user-001",
+    aud: "authenticated",
+    app_metadata: {},
+    user_metadata: {},
+    created_at: "2026-08-04T00:00:00Z",
+    email: "agent@example.com",
+  },
+} as Session;
 
 function renderRoute(path: string) {
   const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>,
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>,
   );
 }
 
 describe("Candidate CRM Phase 2.5 routes", () => {
-  it("Supabase未設定時に仮データモードを案内する", () => {
-    renderRoute("/login");
-    expect(screen.getByText("Supabase未設定")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "仮データモードを開く" }),
-    ).toBeInTheDocument();
+  beforeEach(() => {
+    authMocks.getSession.mockResolvedValue({
+      data: { session: authenticatedSession },
+      error: null,
+    });
+    authMocks.onAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: authMocks.unsubscribe } },
+    });
+    authMocks.signInWithPassword.mockResolvedValue({
+      data: { session: authenticatedSession, user: authenticatedSession.user },
+      error: null,
+    });
+    authMocks.signOut.mockResolvedValue({ error: null });
   });
-  it("ホームに今日の対応を表示する", () => {
+
+  it("ホームに今日の対応とログインユーザーを表示する", async () => {
     renderRoute("/");
     expect(
-      screen.getByRole("heading", { name: "今日のホーム" }),
+      await screen.findByRole("heading", { name: "今日のホーム" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "今日の対応" }),
@@ -33,13 +85,14 @@ describe("Candidate CRM Phase 2.5 routes", () => {
     expect(
       screen.getByText("一次面接の企業フィードバックを回収"),
     ).toBeInTheDocument();
+    expect(screen.getByText("agent@example.com")).toBeInTheDocument();
   });
 
   it("候補者一覧から候補者詳細へ遷移できる", async () => {
     const user = userEvent.setup();
     renderRoute("/candidates");
     await user.type(
-      screen.getByRole("textbox", { name: "候補者検索" }),
+      await screen.findByRole("textbox", { name: "候補者検索" }),
       "佐藤",
     );
     await user.click(screen.getByRole("link", { name: "佐藤 健太" }));
@@ -79,7 +132,9 @@ describe("Candidate CRM Phase 2.5 routes", () => {
   it("求人一覧から求人詳細へ遷移できる", async () => {
     const user = userEvent.setup();
     renderRoute("/jobs");
-    await user.click(screen.getByRole("link", { name: "TAVI製品 営業担当" }));
+    await user.click(
+      await screen.findByRole("link", { name: "TAVI製品 営業担当" }),
+    );
     expect(
       await screen.findByRole("heading", { name: "TAVI製品 営業担当" }),
     ).toBeInTheDocument();
@@ -113,7 +168,9 @@ describe("Candidate CRM Phase 2.5 routes", () => {
   it("候補者画面でパイプライン表示へ切り替えられる", async () => {
     const user = userEvent.setup();
     renderRoute("/candidates");
-    await user.click(screen.getByRole("button", { name: "パイプライン" }));
+    await user.click(
+      await screen.findByRole("button", { name: "パイプライン" }),
+    );
     expect(
       screen.getByRole("region", { name: "面談前列" }),
     ).toBeInTheDocument();

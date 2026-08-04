@@ -27,6 +27,3 @@ coverage/
 
 # Tauri generated files
 src-tauri/gen/
-
-# Supabase local state
-supabase/.temp/

@@ -1,14 +1,16 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext } from "react";
 
+export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
 export type AuthContextValue = {
-  isConfigured: boolean;
-  isLoading: boolean;
+  status: AuthStatus;
   session: Session | null;
   user: User | null;
-  error: string | null;
-  signIn: (email: string, password: string) => Promise<string | null>;
-  signOut: () => Promise<string | null>;
+  errorMessage: string | null;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signOut: () => Promise<boolean>;
+  clearError: () => void;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

@@ -2,7 +2,7 @@
 
 ## Project scope
 
-Candidate CRM is a cross-platform Tauri 2 desktop application for macOS and Windows. Phase 3 adds an optional Supabase authentication boundary, a multi-tenant CRM schema, and typed repository functions while retaining typed mock data when Supabase is not configured.
+Candidate CRM is a cross-platform Tauri 2 desktop application for macOS and Windows. Phase 3A adds Supabase email/password authentication while retaining the existing typed mock CRM data.
 
 ## Working agreements
 
@@ -12,8 +12,8 @@ Candidate CRM is a cross-platform Tauri 2 desktop application for macOS and Wind
 - Keep the dependency set focused. Discuss large frameworks or infrastructure additions before installing them.
 - Do not suppress TypeScript, ESLint, test, Rust, or build failures to make checks pass.
 - Keep secrets out of Git. Only document variable names in `.env.example`.
-- Keep mock data in `src/data`, domain types in `src/types`, and Supabase access behind `src/services` or `src/lib/supabase`.
-- Keep all public-schema tables protected by RLS and organization-scoped policies.
+- Keep mock data in `src/data`, domain types in `src/types`, and authentication code in `src/features/auth`.
+- Do not add database migrations, profiles, or CRM data access during Phase 3A.
 - Never place a Supabase `service_role` key or other server secret in Vite client code.
 
 ## Required checks
