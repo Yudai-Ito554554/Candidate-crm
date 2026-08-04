@@ -45,9 +45,22 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: var(--background);
+  text-rendering: optimizeLegibility;
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
+}
+
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: oklch(0.85 0.08 250);
 }
