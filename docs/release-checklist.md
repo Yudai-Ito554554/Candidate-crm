@@ -24,13 +24,14 @@ QA成果物のビルドには、対象Supabaseプロジェクトの次の公開�
 
 GitHub Actionsから`Desktop QA artifacts`を手動実行します。
 
-- macOS: `.app`と`.dmg`
+- macOS: `.dmg`
 - Windows: `.msi`とNSIS `.exe`
 - macOS QA版はTauriの疑似ID `-`でアドホック署名し、`.app`とDMG内のアプリを`codesign --verify --deep --strict`で検証する
+- ダウンロードZIPはインストーラー、`sha256-manifest.json`、`INSTALL.txt`だけを直下に配置し、生の`.app`やビルドディレクトリを含めない
 - 各成果物には`sha256-manifest.json`を同梱し、バージョン、OS、CPUアーキテクチャ、ファイルサイズ、SHA-256を記録する
 - 成果物の保持期間は7日
 - 未署名成果物は社内QAだけに使用し、一般配布しない
-- アドホック署名はAppleによる本人確認やNotarizationではないため、初回起動時にmacOSの「プライバシーとセキュリティ」で許可が必要な場合がある
+- アドホック署名は改変検知用であり、Appleによる本人確認やNotarizationではない。Gatekeeperの警告をなくすことはできず、初回起動時にmacOSの「プライバシーとセキュリティ」で許可が必要な場合がある
 - インストール後、設定エラー画面ではなくログイン画面が表示されることを確認する
 
 ## 4. macOS正式配布

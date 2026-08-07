@@ -71,7 +71,7 @@ npm run tauri build
 
 Tauriの本番WebViewにはCSPを設定しています。標準の`*.supabase.co`以外のSupabaseカスタムドメインを利用する場合は、リリース前に`src-tauri/tauri.conf.json`の`connect-src`をそのドメインへ限定して追加してください。開発時はViteの動的なローカル接続を妨げないよう`devCsp`を無効にしています。
 
-macOS・Windowsの社内QA成果物は、GitHub Actionsの`Desktop QA artifacts`を手動実行して生成します。macOS QA版にはブラウザ経由の取得で壊れたアプリと判定されないようアドホック署名を付け、`.app`とDMG内の署名をアップロード前に検証します。これはAppleによる本人確認やNotarizationではありません。ビルドにはRepository secretsの`VITE_SUPABASE_URL`と`VITE_SUPABASE_PUBLISHABLE_KEY`が必要です。一般配布前の正式署名、Notarization、インストール確認は[`docs/release-checklist.md`](docs/release-checklist.md)に従ってください。
+macOS・Windowsの社内QA成果物は、GitHub Actionsの`Desktop QA artifacts`を手動実行して生成します。macOS QA版には改変検知のためのアドホック署名を付け、`.app`とDMG内の署名をアップロード前に検証します。ダウンロードZIPは、インストーラー、`sha256-manifest.json`、日本語の`INSTALL.txt`だけを直下に置きます。アドホック署名はAppleによる本人確認やNotarizationではないため、Gatekeeperの警告をなくすものではありません。ビルドにはRepository secretsの`VITE_SUPABASE_URL`と`VITE_SUPABASE_PUBLISHABLE_KEY`が必要です。一般配布前の正式署名、Notarization、インストール確認は[`docs/release-checklist.md`](docs/release-checklist.md)に従ってください。
 
 ## Phase 2.5 の画面
 

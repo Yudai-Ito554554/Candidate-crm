@@ -30,4 +30,22 @@ describe("desktop artifact workflow", () => {
       workflow.indexOf("Upload unsigned QA artifacts"),
     );
   });
+
+  it("uploads a concise QA package without the raw macOS app bundle", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain('package_path="artifacts/qa-package"');
+    expect(workflow).toContain(
+      'cp artifacts/sha256-manifest.json "$package_path/"',
+    );
+    expect(workflow).toContain('"$package_path/INSTALL.txt"');
+    expect(workflow).toContain("path: artifacts/qa-package/");
+    expect(workflow).not.toContain(
+      "src-tauri/target/release/bundle/macos/*.app",
+    );
+
+    expect(workflow.indexOf("Stage concise QA package")).toBeLessThan(
+      workflow.indexOf("Upload unsigned QA artifacts"),
+    );
+  });
 });

@@ -19,18 +19,10 @@ jobs:
             os: macos-latest
             apple_signing_identity: "-"
             artifact_name: candidate-crm-macos-unsigned
-            artifact_paths: |
-              src-tauri/target/release/bundle/dmg/*.dmg
-              src-tauri/target/release/bundle/macos/*.app
-              artifacts/sha256-manifest.json
           - platform: Windows
             os: windows-latest
             apple_signing_identity: ""
             artifact_name: candidate-crm-windows-unsigned
-            artifact_paths: |
-              src-tauri/target/release/bundle/msi/*.msi
-              src-tauri/target/release/bundle/nsis/*-setup.exe
-              artifacts/sha256-manifest.json
 
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -105,10 +97,45 @@ jobs:
       - name: Generate artifact manifest
         run: npm run artifacts:manifest
 
+      - name: Stage concise QA package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_path="artifacts/qa-package"
+          mkdir -p "$package_path"
+          cp artifacts/sha256-manifest.json "$package_path/"
+
+          if [[ "${{ matrix.platform }}" == "macOS" ]]; then
+            find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -exec cp {} "$package_path/" \;
+            cat > "$package_path/INSTALL.txt" <<'EOF'
+          Candidate CRM macOS 社内QA版
+
+          1. DMGを開き、Candidate CRMをApplicationsへドラッグします。
+          2. DMGを閉じ、Finderの「アプリケーション」からCandidate CRMを開きます。
+          3. この成果物はApple公証前の社内QA専用品です。macOSが起動を拒否する場合は、
+             システム設定 > プライバシーとセキュリティ から許可してください。
+
+          「壊れている」「マルウェアが含まれていないことを検証できない」と表示される環境では、
+          Developer ID署名・Apple公証済みの正式配布版が必要です。一般利用者へ配布しないでください。
+          EOF
+          else
+            find src-tauri/target/release/bundle/msi -maxdepth 1 -name '*.msi' -exec cp {} "$package_path/" \;
+            find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*-setup.exe' -exec cp {} "$package_path/" \;
+            cat > "$package_path/INSTALL.txt" <<'EOF'
+          Candidate CRM Windows 社内QA版
+
+          MSIまたはsetup.exeを実行してインストールします。
+          この成果物はコード署名前の社内QA専用品です。一般利用者へ配布しないでください。
+          EOF
+          fi
+
+          test "$(find "$package_path" -maxdepth 1 -type f | wc -l)" -ge 3
+
       - name: Upload unsigned QA artifacts
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_paths }}
+          path: artifacts/qa-package/
           if-no-files-found: error
           retention-days: 7
