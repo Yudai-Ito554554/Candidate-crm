@@ -9,7 +9,7 @@ import {
   useArchivedCompaniesQuery,
   useRestoreCompanyMutation,
 } from "@/features/applications/application-queries";
-import { formatDate } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 
 export function ArchivedCompanies() {
   const companiesQuery = useArchivedCompaniesQuery();
@@ -110,7 +110,7 @@ export function ArchivedCompanies() {
                   </Td>
                   <Td className="whitespace-nowrap">
                     {company.archived_at
-                      ? formatDate(company.archived_at)
+                      ? formatDateTime(company.archived_at)
                       : "-"}
                   </Td>
                   <Td className="text-right">

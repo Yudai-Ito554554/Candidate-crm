@@ -13,7 +13,7 @@ import {
   useCompaniesQuery,
   useRestoreJobMutation,
 } from "@/features/applications/application-queries";
-import { formatDate } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 
 export function ArchivedJobs() {
   const jobsQuery = useArchivedJobsQuery();
@@ -134,7 +134,7 @@ export function ArchivedJobs() {
                       <Badge value={jobStatusLabels[job.job_status]} />
                     </Td>
                     <Td className="whitespace-nowrap">
-                      {job.archived_at ? formatDate(job.archived_at) : "-"}
+                      {job.archived_at ? formatDateTime(job.archived_at) : "-"}
                     </Td>
                     <Td className="text-right">
                       <EditorOnly>

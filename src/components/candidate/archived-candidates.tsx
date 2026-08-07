@@ -11,7 +11,7 @@ import {
   useRestoreCandidateMutation,
 } from "@/features/candidates/candidate-queries";
 import { candidateStatusLabels } from "@/features/candidates/candidate-view";
-import { formatDate } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 
 export function ArchivedCandidates() {
   const candidatesQuery = useArchivedCandidatesQuery();
@@ -110,7 +110,7 @@ export function ArchivedCandidates() {
                   </Td>
                   <Td className="whitespace-nowrap">
                     {candidate.archived_at
-                      ? formatDate(candidate.archived_at)
+                      ? formatDateTime(candidate.archived_at)
                       : "-"}
                   </Td>
                   <Td className="text-right">

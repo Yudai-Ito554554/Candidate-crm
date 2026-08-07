@@ -11,6 +11,22 @@ export function formatDate(date: string) {
   return `${year}/${month}/${day}`;
 }
 
+export function formatDateTime(value: string) {
+  if (!value || value === "-") return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export function isOverdueDate(
   date: string,
   today = getLocalDateString(),
