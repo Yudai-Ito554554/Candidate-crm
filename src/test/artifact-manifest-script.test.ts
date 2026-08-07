@@ -136,6 +136,7 @@ describe("generate-artifact-manifest", () => {
       {
         cwd: repository,
         encoding: "utf8",
+        env: { ...process.env, GITHUB_SHA: "" },
       },
     );
 
@@ -172,6 +173,7 @@ describe("generate-artifact-manifest", () => {
       {
         cwd: repository,
         encoding: "utf8",
+        env: { ...process.env, GITHUB_SHA: "" },
       },
     );
 
@@ -188,6 +190,7 @@ describe("generate-artifact-manifest", () => {
     const result = spawnSync(process.execPath, [scriptPath], {
       cwd: repository,
       encoding: "utf8",
+      env: { ...process.env, GITHUB_SHA: "" },
     });
 
     expect(result.status).toBe(1);
