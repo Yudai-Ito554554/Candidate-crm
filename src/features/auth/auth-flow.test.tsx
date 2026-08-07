@@ -11,8 +11,12 @@ const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   signInWithPassword: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
   signOut: vi.fn(),
   unsubscribe: vi.fn(),
+}));
+const profileMocks = vi.hoisted(() => ({
+  listProfiles: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -27,6 +31,10 @@ vi.mock("@/lib/env", () => ({
 
 vi.mock("@/lib/supabase", () => ({
   getSupabaseClient: vi.fn(() => Promise.resolve({ auth: authMocks })),
+}));
+
+vi.mock("@/services/profiles-repository", () => ({
+  listProfiles: profileMocks.listProfiles,
 }));
 
 const authenticatedSession = {
@@ -69,6 +77,23 @@ describe("Supabase authentication flow", () => {
       data: { subscription: { unsubscribe: authMocks.unsubscribe } },
     });
     authMocks.signOut.mockResolvedValue({ error: null });
+    authMocks.resetPasswordForEmail.mockResolvedValue({
+      data: {},
+      error: null,
+    });
+    profileMocks.listProfiles.mockResolvedValue({
+      data: [
+        {
+          id: "user-001",
+          display_name: "テスト担当者",
+          email: "agent@example.com",
+          role: "agent",
+          created_at: "2026-08-04T00:00:00Z",
+          updated_at: "2026-08-04T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
   });
 
   it("未ログイン時にCRMを表示せずログイン画面へ移動する", async () => {
@@ -114,6 +139,33 @@ describe("Supabase authentication flow", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "メールアドレスまたはパスワードが正しくありません。",
     );
+  });
+
+  it("ログイン画面からパスワード再設定へ移動してメールを送信する", async () => {
+    const user = userEvent.setup();
+    renderRoute("/login");
+
+    await user.click(
+      await screen.findByRole("link", { name: "パスワードを忘れた場合" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "パスワードを再設定" }),
+    ).toBeVisible();
+    await user.type(
+      screen.getByLabelText("メールアドレス"),
+      "agent@example.com",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "再設定メールを送信" }),
+    );
+
+    expect(authMocks.resetPasswordForEmail).toHaveBeenCalledWith(
+      "agent@example.com",
+      { redirectTo: "candidate-crm://auth/callback" },
+    );
+    expect(
+      await screen.findByText(/登録済みのメールアドレスであれば/),
+    ).toBeVisible();
   });
 
   it("ログアウト後にログインへ戻りQueryキャッシュを破棄する", async () => {

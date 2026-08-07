@@ -6,6 +6,7 @@ import {
   AuthContext,
   type AuthContextValue,
 } from "@/features/auth/auth-context";
+import { installAuthDeepLinkListener } from "@/features/auth/auth-deep-link";
 import { translateAuthError } from "@/features/auth/auth-errors";
 import { environment } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let isMounted = true;
     let unsubscribe: (() => void) | undefined;
+    let unsubscribeDeepLinks: (() => void) | undefined;
 
     void getSupabaseClient()
       .then(async (client) => {
@@ -50,6 +52,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         );
         unsubscribe = () => listener.subscription.unsubscribe();
+
+        const removeDeepLinkListener = await installAuthDeepLinkListener(
+          client,
+          (kind) => {
+            if (!isMounted) return;
+            setErrorMessage(null);
+            window.history.replaceState({}, "", `/set-password?mode=${kind}`);
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          },
+          (message) => {
+            if (!isMounted) return;
+            setErrorMessage(message);
+            window.history.replaceState({}, "", "/login");
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          },
+        );
+        if (isMounted) unsubscribeDeepLinks = removeDeepLinkListener;
+        else removeDeepLinkListener();
       })
       .catch(() => {
         if (!isMounted) return;
@@ -62,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
       unsubscribe?.();
+      unsubscribeDeepLinks?.();
     };
   }, [queryClient]);
 

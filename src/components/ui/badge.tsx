@@ -13,6 +13,7 @@ const badgeStyles: Record<string, string> = {
   内定: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
   入社: "bg-green-50 text-green-700 ring-green-600/20",
   保留: "bg-slate-100 text-slate-600 ring-slate-500/20",
+  終了: "bg-slate-100 text-slate-500 ring-slate-400/20",
   検討中: "bg-slate-100 text-slate-700 ring-slate-500/20",
   応募済み: "bg-blue-50 text-blue-700 ring-blue-600/20",
   書類選考: "bg-indigo-50 text-indigo-700 ring-indigo-600/20",

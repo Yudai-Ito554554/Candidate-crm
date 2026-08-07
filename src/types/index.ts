@@ -8,7 +8,8 @@ export type CandidateStatus =
   | "選考中"
   | "内定"
   | "入社"
-  | "保留";
+  | "保留"
+  | "終了";
 
 export type ApplicationStatus =
   | "検討中"

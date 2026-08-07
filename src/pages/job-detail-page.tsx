@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
-  BriefcaseBusiness,
-  FileText,
+  LoaderCircle,
   MapPin,
   Pencil,
   UserRound,
@@ -10,18 +9,28 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { DefinitionGrid } from "@/components/common/definition-grid";
-import { PlannedButton } from "@/components/common/planned-button";
+import { EntityFiles } from "@/components/common/entity-files";
+import { EntityTags } from "@/components/common/entity-tags";
 import { SectionCard } from "@/components/common/section-card";
+import { JobActivityHistory } from "@/components/job/job-activity-history";
+import { JobCandidateProposal } from "@/components/job/job-candidate-proposal";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableContainer, Td, Th } from "@/components/ui/table";
+import { EditorOnly } from "@/features/access/editor-only";
 import {
-  applications,
-  candidates,
-  getCandidate,
-  getJob,
-} from "@/data/mock-data";
-import { formatDate, formatSalary } from "@/lib/format";
+  applicationStatusLabels,
+  jobStatusLabels,
+} from "@/features/applications/application-model";
+import {
+  useApplicationsDataQuery,
+  useCompaniesQuery,
+  useCompanyContactsQuery,
+  useJobsQuery,
+} from "@/features/applications/application-queries";
+import { useCandidatesQuery } from "@/features/candidates/candidate-queries";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -34,25 +43,70 @@ const tabs = [
 ] as const;
 type JobTab = (typeof tabs)[number];
 
+function salaryLabel(min: number | null, max: number | null) {
+  if (min === null && max === null) return "-";
+  if (min !== null && max !== null) return `${min}〜${max}万円`;
+  return min !== null ? `${min}万円〜` : `〜${max}万円`;
+}
+
 export function JobDetailPage() {
   const { jobId = "" } = useParams();
-  const job = getJob(jobId);
+  const jobsQuery = useJobsQuery();
+  const companiesQuery = useCompaniesQuery();
+  const applicationsQuery = useApplicationsDataQuery();
+  const candidatesQuery = useCandidatesQuery();
+  const job = (jobsQuery.data ?? []).find((item) => item.id === jobId);
+  const contactsQuery = useCompanyContactsQuery(job?.company_id ?? "");
   const [activeTab, setActiveTab] = useState<JobTab>("概要");
+  const [isProposingCandidate, setIsProposingCandidate] = useState(false);
+  const isPending =
+    jobsQuery.isPending ||
+    companiesQuery.isPending ||
+    applicationsQuery.isPending ||
+    candidatesQuery.isPending;
+  const error =
+    jobsQuery.error ??
+    companiesQuery.error ??
+    applicationsQuery.error ??
+    candidatesQuery.error;
+
+  if (isPending)
+    return (
+      <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-slate-600">
+        <LoaderCircle className="size-5 animate-spin" />
+        求人情報を読み込んでいます…
+      </div>
+    );
+  if (error) return <EmptyState message={error.message} />;
   if (!job) return <EmptyState message="求人が見つかりません" />;
-  const jobApplications = applications.filter(
-    (application) => application.jobId === job.id,
+
+  const company = (companiesQuery.data ?? []).find(
+    (item) => item.id === job.company_id,
   );
-  const proposedCandidates = jobApplications
-    .map((application) => getCandidate(application.candidateId))
-    .filter((candidate) => candidate !== undefined);
-  const suggestedCandidates = candidates
+  const hiringManager = (contactsQuery.data ?? []).find(
+    (item) => item.id === job.contact_id,
+  );
+  const candidates = new Map(
+    (candidatesQuery.data ?? []).map((candidate) => [candidate.id, candidate]),
+  );
+  const jobApplications = (applicationsQuery.data ?? []).filter(
+    (application) => application.job_id === job.id,
+  );
+  const proposedCandidateIds = new Set(
+    jobApplications.map((application) => application.candidate_id),
+  );
+  const suggestedCandidates = (candidatesQuery.data ?? [])
     .filter(
       (candidate) =>
-        candidate.desiredRole.includes(job.role) ||
-        job.role.includes(candidate.desiredRole),
+        !proposedCandidateIds.has(candidate.id) &&
+        Boolean(job.occupation) &&
+        candidate.desired_occupations.some(
+          (occupation) =>
+            occupation.includes(job.occupation ?? "") ||
+            (job.occupation ?? "").includes(occupation),
+        ),
     )
     .slice(0, 3);
-  const hiringManager = job.hiringManager ?? "佐々木 亮（人事部）";
 
   return (
     <div>
@@ -70,29 +124,46 @@ export function JobDetailPage() {
               <h2 className="text-xl font-semibold text-slate-950">
                 {job.title}
               </h2>
-              <Badge value={job.status} />
+              <Badge value={jobStatusLabels[job.job_status]} />
             </div>
             <p className="mt-1 text-sm font-medium text-slate-700">
-              {job.company} / {job.division}
+              {company?.name ?? "企業未登録"} / {job.division ?? "事業部未登録"}
             </p>
             <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
               <span className="inline-flex items-center gap-1">
                 <MapPin className="size-3.5" />
-                {job.location}
+                {job.locations.join("、") || "勤務地未登録"}
               </span>
-              <span>{formatSalary(job.salaryMin, job.salaryMax)}</span>
-              <span>採用担当：{hiringManager}</span>
+              <span>{salaryLabel(job.salary_min, job.salary_max)}</span>
+              <span>採用担当：{hiringManager?.full_name ?? "未設定"}</span>
             </div>
           </div>
-          <div className="flex gap-2">
-            <PlannedButton className="gap-1.5" size="sm" variant="outline">
-              <UserRound className="size-4" />
-              候補者を提案
-            </PlannedButton>
-            <PlannedButton aria-label="求人を編集" className="px-2" size="sm">
-              <Pencil className="size-4" />
-            </PlannedButton>
-          </div>
+          <EditorOnly>
+            <div className="flex gap-2">
+              <Button
+                className="gap-1.5"
+                onClick={() => {
+                  setActiveTab("候補者");
+                  setIsProposingCandidate(true);
+                }}
+                size="sm"
+                variant="outline"
+              >
+                <UserRound className="size-4" />
+                候補者を提案
+              </Button>
+              <Button
+                asChild
+                aria-label="求人を編集"
+                className="px-2"
+                size="sm"
+              >
+                <Link to={`/jobs/${job.id}/edit`}>
+                  <Pencil className="size-4" />
+                </Link>
+              </Button>
+            </div>
+          </EditorOnly>
         </div>
         <div
           className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2"
@@ -117,98 +188,155 @@ export function JobDetailPage() {
           ))}
         </div>
       </section>
+      {isProposingCandidate ? (
+        <JobCandidateProposal
+          applications={applicationsQuery.data ?? []}
+          candidates={candidatesQuery.data ?? []}
+          jobId={job.id}
+          onClose={() => setIsProposingCandidate(false)}
+        />
+      ) : null}
       <div className="mt-4" role="tabpanel">
         {activeTab === "概要" ? (
           <div className="grid gap-4 xl:grid-cols-2">
             <SectionCard title="求人概要">
               <DefinitionGrid
                 items={[
-                  { label: "企業名", value: job.company },
-                  { label: "事業部", value: job.division },
-                  { label: "職種", value: job.role },
-                  { label: "勤務地", value: job.location },
+                  { label: "企業名", value: company?.name ?? "-" },
+                  { label: "事業部", value: job.division ?? "-" },
+                  { label: "職種", value: job.occupation ?? "-" },
+                  { label: "雇用形態", value: job.employment_type ?? "-" },
+                  { label: "勤務地", value: job.locations.join("、") || "-" },
                   {
                     label: "年収",
-                    value: formatSalary(job.salaryMin, job.salaryMax),
+                    value: salaryLabel(job.salary_min, job.salary_max),
                   },
-                  { label: "更新日", value: formatDate(job.updatedAt) },
+                  {
+                    label: "更新日",
+                    value: formatDate(job.updated_at.slice(0, 10)),
+                  },
                 ]}
               />
             </SectionCard>
             <SectionCard title="採用状況">
               <DefinitionGrid
                 items={[
-                  { label: "募集状況", value: <Badge value={job.status} /> },
-                  { label: "選考中人数", value: `${job.activeCandidates}名` },
-                  { label: "採用担当者", value: hiringManager },
-                  { label: "採用期限", value: "2026年10月末" },
+                  {
+                    label: "募集状況",
+                    value: <Badge value={jobStatusLabels[job.job_status]} />,
+                  },
+                  { label: "選考中人数", value: `${jobApplications.length}名` },
+                  {
+                    label: "採用担当者",
+                    value: hiringManager?.full_name ?? "未設定",
+                  },
+                  {
+                    label: "募集開始日",
+                    value: formatDate(job.opened_at ?? "-"),
+                  },
+                  {
+                    label: "募集終了日",
+                    value: formatDate(job.closed_at ?? "-"),
+                  },
                 ]}
               />
             </SectionCard>
             <SectionCard className="xl:col-span-2" title="業務内容・要件">
               <div className="max-w-4xl space-y-4 text-sm leading-7 text-slate-700">
-                <p>
-                  医療機関の担当者へ製品・サービスを提案し、導入後の支援まで一貫して担当します。
-                </p>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-500">
+                    業務内容
+                  </h3>
+                  <p className="whitespace-pre-wrap">
+                    {job.description ?? "未登録"}
+                  </p>
+                </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500">
                     必須要件
                   </h3>
-                  <p>医療業界での実務経験、顧客折衝経験、普通自動車運転免許</p>
+                  <p className="whitespace-pre-wrap">
+                    {job.required_conditions ?? "未登録"}
+                  </p>
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-500">
-                    採用上の留意点
+                    歓迎要件
                   </h3>
-                  <p>担当エリアと出張頻度を候補者へ事前に説明してください。</p>
+                  <p className="whitespace-pre-wrap">
+                    {job.preferred_conditions ?? "未登録"}
+                  </p>
                 </div>
               </div>
             </SectionCard>
+            <EntityTags
+              className="xl:col-span-2"
+              label="求人"
+              target={{ kind: "job", id: job.id }}
+            />
           </div>
         ) : null}
         {activeTab === "候補者" ? (
           <div className="space-y-4">
             <SectionCard
+              description="希望職種との一致から抽出"
               title="提案候補"
-              description="希望条件と職種経験から抽出"
             >
-              <div className="grid gap-2 md:grid-cols-3">
-                {suggestedCandidates.map((candidate) => (
-                  <Link
-                    className="rounded-md border border-slate-200 p-3 hover:border-blue-300"
-                    key={candidate.id}
-                    to={`/candidates/${candidate.id}`}
-                  >
-                    <p className="font-semibold text-blue-700">
-                      {candidate.name}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {candidate.currentRole} ・ {candidate.location}
-                    </p>
-                  </Link>
-                ))}
-              </div>
+              {suggestedCandidates.length ? (
+                <div className="grid gap-2 md:grid-cols-3">
+                  {suggestedCandidates.map((candidate) => (
+                    <Link
+                      className="rounded-md border border-slate-200 p-3 hover:border-blue-300"
+                      key={candidate.id}
+                      to={`/candidates/${candidate.id}`}
+                    >
+                      <p className="font-semibold text-blue-700">
+                        {candidate.full_name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {candidate.current_occupation ?? "職種未登録"} ・{" "}
+                        {candidate.prefecture ?? "居住地未登録"}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message="条件に合う未提案候補者はいません" />
+              )}
             </SectionCard>
             <SectionCard title="提案済み・選考中">
-              <div className="grid gap-2 md:grid-cols-3">
-                {proposedCandidates.map((candidate) => (
-                  <Link
-                    className="rounded-md border border-slate-200 p-3 hover:border-blue-300"
-                    key={candidate.id}
-                    to={`/candidates/${candidate.id}`}
-                  >
-                    <div className="flex justify-between gap-2">
-                      <p className="font-semibold text-blue-700">
-                        {candidate.name}
-                      </p>
-                      <Badge value={candidate.status} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      次回：{formatDate(candidate.nextContactDate)}
-                    </p>
-                  </Link>
-                ))}
-              </div>
+              {jobApplications.length ? (
+                <div className="grid gap-2 md:grid-cols-3">
+                  {jobApplications.map((application) => {
+                    const candidate = candidates.get(application.candidate_id);
+                    return (
+                      <Link
+                        className="rounded-md border border-slate-200 p-3 hover:border-blue-300"
+                        key={application.id}
+                        to={`/candidates/${application.candidate_id}`}
+                      >
+                        <div className="flex justify-between gap-2">
+                          <p className="font-semibold text-blue-700">
+                            {candidate?.full_name ?? "候補者未登録"}
+                          </p>
+                          <Badge
+                            value={
+                              applicationStatusLabels[
+                                application.application_status
+                              ]
+                            }
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          次回：{application.next_event ?? "未設定"}
+                        </p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState message="提案済み候補者はいません" />
+              )}
             </SectionCard>
           </div>
         ) : null}
@@ -231,19 +359,30 @@ export function JobDetailPage() {
                         <Td>
                           <Link
                             className="font-semibold text-blue-700 hover:underline"
-                            to={`/candidates/${application.candidateId}`}
+                            to={`/candidates/${application.candidate_id}`}
                           >
-                            {getCandidate(application.candidateId)?.name}
+                            {candidates.get(application.candidate_id)
+                              ?.full_name ?? "候補者未登録"}
                           </Link>
                         </Td>
                         <Td>
-                          <Badge value={application.status} />
+                          <Badge
+                            value={
+                              applicationStatusLabels[
+                                application.application_status
+                              ]
+                            }
+                          />
                         </Td>
                         <Td>
-                          {application.nextStep} ・{" "}
-                          {formatDate(application.nextStepDate)}
+                          {application.next_event ?? "-"} ・{" "}
+                          {formatDate(
+                            (application.next_event_at ?? "-").slice(0, 10),
+                          )}
                         </Td>
-                        <Td>{formatDate(application.updatedAt)}</Td>
+                        <Td>
+                          {formatDate(application.updated_at.slice(0, 10))}
+                        </Td>
                       </tr>
                     ))}
                   </tbody>
@@ -255,46 +394,18 @@ export function JobDetailPage() {
           </SectionCard>
         ) : null}
         {activeTab === "活動履歴" ? (
-          <SectionCard title="求人の活動履歴">
-            <div className="space-y-3">
-              {[
-                "採用要件の追加ヒアリング",
-                "求人票の年収レンジを更新",
-                "候補者3名の進捗を企業へ共有",
-              ].map((text, index) => (
-                <div
-                  className="flex gap-3 border-b border-slate-100 pb-3 text-sm last:border-0"
-                  key={text}
-                >
-                  <BriefcaseBusiness className="size-4 text-blue-600" />
-                  <div>
-                    <p className="font-medium">{text}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      2026/08/0{3 - index} ・ 伊東 勇大
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+          <JobActivityHistory
+            candidates={candidatesQuery.data ?? []}
+            jobId={job.id}
+          />
         ) : null}
         {activeTab === "ファイル・求人票" ? (
-          <SectionCard title="ファイル・求人票">
-            <div className="flex items-center gap-3 rounded-md border border-slate-200 p-3">
-              <FileText className="size-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium">求人票_20260801.pdf</p>
-                <p className="text-xs text-slate-500">
-                  ダウンロードは次のPhaseで実装予定です
-                </p>
-              </div>
-            </div>
-          </SectionCard>
+          <EntityFiles target={{ jobId: job.id }} />
         ) : null}
         {activeTab === "メモ" ? (
           <SectionCard title="社内メモ">
-            <p className="max-w-3xl text-sm leading-7 text-slate-700">
-              採用担当者との連絡は原則メール。候補者推薦時には転職理由と担当施設の規模を明記する。
+            <p className="max-w-3xl whitespace-pre-wrap text-sm leading-7 text-slate-700">
+              {job.internal_notes ?? "メモはありません"}
             </p>
           </SectionCard>
         ) : null}

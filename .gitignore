@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+artifacts/
 src-tauri/target/
 
 # Environment files
@@ -27,3 +28,6 @@ coverage/
 
 # Tauri generated files
 src-tauri/gen/
+
+# Supabase CLI local state
+supabase/.temp/

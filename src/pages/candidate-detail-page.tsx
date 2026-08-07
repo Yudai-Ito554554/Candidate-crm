@@ -3,27 +3,38 @@ import {
   BriefcaseBusiness,
   CalendarPlus,
   Check,
+  LoaderCircle,
   Mail,
   MessageSquarePlus,
   Pencil,
   Phone,
   UserRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { CandidateAi } from "@/components/candidate/candidate-ai";
 import { CandidateApplications } from "@/components/candidate/candidate-applications";
+import { CandidateExperiences } from "@/components/candidate/candidate-experiences";
 import { CandidateOverview } from "@/components/candidate/candidate-overview";
+import { CandidateTags } from "@/components/candidate/candidate-tags";
 import { CandidateTasks } from "@/components/candidate/candidate-tasks";
 import { CandidateTimeline } from "@/components/candidate/candidate-timeline";
-import { DefinitionGrid } from "@/components/common/definition-grid";
-import { PlannedButton } from "@/components/common/planned-button";
-import { SectionCard } from "@/components/common/section-card";
+import { EntityFiles } from "@/components/common/entity-files";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getCandidate } from "@/data/mock-data";
-import { formatDate, mockToday } from "@/lib/format";
+import { EditorOnly } from "@/features/access/editor-only";
+import {
+  useApplicationsQuery,
+  useCandidateQuery,
+  useCompleteCandidateNextActionMutation,
+  useProfilesQuery,
+  useRecordCandidateViewMutation,
+} from "@/features/candidates/candidate-queries";
+import { toCandidateView } from "@/features/candidates/candidate-view";
+import { useAuth } from "@/features/auth/use-auth";
+import { formatDate, isOverdueDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -39,8 +50,66 @@ type DetailTab = (typeof tabs)[number];
 
 export function CandidateDetailPage() {
   const { candidateId = "" } = useParams();
-  const candidate = getCandidate(candidateId);
+  const auth = useAuth();
+  const candidateQuery = useCandidateQuery(candidateId);
+  const recordViewMutation = useRecordCandidateViewMutation();
+  const recordView = recordViewMutation.mutate;
+  const profilesQuery = useProfilesQuery();
+  const applicationsQuery = useApplicationsQuery();
+  const candidate = useMemo(
+    () =>
+      candidateQuery.data
+        ? toCandidateView(
+            candidateQuery.data,
+            profilesQuery.data ?? [],
+            applicationsQuery.data ?? [],
+          )
+        : null,
+    [applicationsQuery.data, candidateQuery.data, profilesQuery.data],
+  );
   const [activeTab, setActiveTab] = useState<DetailTab>("タイムライン");
+  const [activityComposer, setActivityComposer] = useState(0);
+  const [applicationComposer, setApplicationComposer] = useState(0);
+  const [taskComposer, setTaskComposer] = useState(0);
+  const [confirmNextActionCompletion, setConfirmNextActionCompletion] =
+    useState(false);
+  const completeNextAction =
+    useCompleteCandidateNextActionMutation(candidateId);
+
+  useEffect(() => {
+    if (!candidateQuery.data?.id || !auth.user?.id) return;
+    recordView({
+      candidateId: candidateQuery.data.id,
+    });
+  }, [auth.user?.id, candidateQuery.data?.id, recordView]);
+
+  if (candidateQuery.isPending)
+    return (
+      <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-slate-600">
+        <LoaderCircle className="size-5 animate-spin" />
+        候補者情報を読み込んでいます…
+      </div>
+    );
+
+  if (candidateQuery.isError)
+    return (
+      <div>
+        <Link
+          className="mb-4 inline-flex items-center gap-2 text-sm text-blue-700"
+          to="/candidates"
+        >
+          <ArrowLeft className="size-4" />
+          候補者一覧へ戻る
+        </Link>
+        <EmptyState
+          message={
+            candidateQuery.error instanceof Error
+              ? candidateQuery.error.message
+              : "候補者を読み込めませんでした"
+          }
+        />
+      </div>
+    );
 
   if (!candidate)
     return (
@@ -55,7 +124,9 @@ export function CandidateDetailPage() {
         <EmptyState message="候補者が見つかりません" />
       </div>
     );
-  const priority = candidate.nextContactDate <= mockToday ? "高" : "中";
+  const isOverdue = isOverdueDate(candidate.nextContactDate);
+  const hasNextAction = Boolean(candidateQuery.data?.next_action?.trim());
+  const priority = isOverdue ? "高" : "中";
   const waitingState =
     candidate.status === "選考中" || candidate.status === "応募意思確認"
       ? "相手待ち"
@@ -63,6 +134,14 @@ export function CandidateDetailPage() {
 
   return (
     <div>
+      {recordViewMutation.error ? (
+        <p
+          className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+          role="alert"
+        >
+          閲覧履歴を更新できませんでした。候補者情報の操作は継続できます。
+        </p>
+      ) : null}
       <Link
         className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-700"
         to="/candidates"
@@ -94,47 +173,56 @@ export function CandidateDetailPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                <PlannedButton
-                  className="h-8 gap-1"
-                  size="sm"
-                  variant="outline"
-                >
-                  <MessageSquarePlus className="size-3.5" />
-                  活動追加
-                </PlannedButton>
-                <PlannedButton
-                  className="h-8 gap-1"
-                  size="sm"
-                  variant="outline"
-                >
-                  <Mail className="size-3.5" />
-                  メール作成
-                </PlannedButton>
-                <PlannedButton
-                  className="h-8 gap-1"
-                  size="sm"
-                  variant="outline"
-                >
-                  <BriefcaseBusiness className="size-3.5" />
-                  求人提案
-                </PlannedButton>
-                <PlannedButton
-                  className="h-8 gap-1"
-                  size="sm"
-                  variant="outline"
-                >
-                  <CalendarPlus className="size-3.5" />
-                  タスク追加
-                </PlannedButton>
-                <PlannedButton
-                  aria-label="候補者を編集"
-                  className="h-8 px-2"
-                  size="sm"
-                >
-                  <Pencil className="size-3.5" />
-                </PlannedButton>
-              </div>
+              <EditorOnly>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    className="h-8 gap-1"
+                    onClick={() => {
+                      setActiveTab("タイムライン");
+                      setActivityComposer((value) => value + 1);
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <MessageSquarePlus className="size-3.5" />
+                    活動追加
+                  </Button>
+                  <Button
+                    className="h-8 gap-1"
+                    onClick={() => {
+                      setActiveTab("求人・選考");
+                      setApplicationComposer((value) => value + 1);
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <BriefcaseBusiness className="size-3.5" />
+                    求人提案
+                  </Button>
+                  <Button
+                    className="h-8 gap-1"
+                    onClick={() => {
+                      setActiveTab("タスク");
+                      setTaskComposer((value) => value + 1);
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <CalendarPlus className="size-3.5" />
+                    タスク追加
+                  </Button>
+                  <Button
+                    aria-label="候補者を編集"
+                    asChild
+                    className="h-8 px-2"
+                    size="sm"
+                  >
+                    <Link to={`/candidates/${candidate.id}/edit`}>
+                      <Pencil className="size-3.5" />
+                    </Link>
+                  </Button>
+                </div>
+              </EditorOnly>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:grid-cols-4 xl:grid-cols-6">
               <div>
@@ -148,7 +236,7 @@ export function CandidateDetailPage() {
                 <dd
                   className={cn(
                     "mt-0.5 font-semibold",
-                    candidate.nextContactDate <= mockToday && "text-rose-700",
+                    isOverdue && "text-rose-700",
                   )}
                 >
                   {formatDate(candidate.nextContactDate)}
@@ -196,21 +284,76 @@ export function CandidateDetailPage() {
               <p
                 className={cn(
                   "text-xs",
-                  candidate.nextContactDate <= mockToday
-                    ? "font-semibold text-rose-700"
-                    : "text-amber-800",
+                  isOverdue ? "font-semibold text-rose-700" : "text-amber-800",
                 )}
               >
                 期限：{formatDate(candidate.nextContactDate)}
               </p>
-              <PlannedButton
-                className="h-7 gap-1 bg-amber-700 text-white hover:bg-amber-800"
-                size="sm"
-              >
-                <Check className="size-3" />
-                完了
-              </PlannedButton>
+              <EditorOnly>
+                {confirmNextActionCompletion ? (
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      className="h-7"
+                      disabled={completeNextAction.isPending}
+                      onClick={() => setConfirmNextActionCompletion(false)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      戻る
+                    </Button>
+                    <Button
+                      className="h-7 gap-1 bg-amber-700 text-white hover:bg-amber-800"
+                      disabled={completeNextAction.isPending}
+                      onClick={() => {
+                        completeNextAction.mutate(undefined, {
+                          onSuccess: () => {
+                            setConfirmNextActionCompletion(false);
+                            setActiveTab("タイムライン");
+                          },
+                        });
+                      }}
+                      size="sm"
+                      type="button"
+                    >
+                      {completeNextAction.isPending ? (
+                        <LoaderCircle className="size-3 animate-spin" />
+                      ) : (
+                        <Check className="size-3" />
+                      )}
+                      完了を確定
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    className="h-7 gap-1 bg-amber-700 text-white hover:bg-amber-800"
+                    disabled={!hasNextAction}
+                    onClick={() => setConfirmNextActionCompletion(true)}
+                    size="sm"
+                    type="button"
+                  >
+                    <Check className="size-3" />
+                    完了
+                  </Button>
+                )}
+              </EditorOnly>
             </div>
+            {confirmNextActionCompletion ? (
+              <p
+                className="mt-2 text-xs font-medium text-amber-900"
+                role="status"
+              >
+                完了すると内容をタイムラインへ記録し、次回対応を未設定にします。
+              </p>
+            ) : null}
+            {completeNextAction.error ? (
+              <p
+                className="mt-2 text-xs font-medium text-rose-700"
+                role="alert"
+              >
+                {completeNextAction.error.message}
+              </p>
+            ) : null}
           </aside>
         </div>
         <div
@@ -239,38 +382,37 @@ export function CandidateDetailPage() {
 
       <div className="mt-3" role="tabpanel">
         {activeTab === "タイムライン" ? (
-          <CandidateTimeline candidateId={candidate.id} />
+          <CandidateTimeline
+            candidateId={candidate.id}
+            initiallyAdding={activityComposer > 0}
+            key={`${candidate.id}-activities-${activityComposer}`}
+          />
         ) : null}
         {activeTab === "概要" ? (
-          <CandidateOverview candidate={candidate} />
+          <div className="space-y-4">
+            <CandidateTags candidateId={candidate.id} />
+            <CandidateOverview candidate={candidate} />
+          </div>
         ) : null}
         {activeTab === "職務経歴" ? (
-          <SectionCard title="現在の職務経歴">
-            <DefinitionGrid
-              items={[
-                { label: "勤務先", value: candidate.company },
-                { label: "部署", value: candidate.department },
-                { label: "職種", value: candidate.currentRole },
-                { label: "在籍期間", value: candidate.employmentPeriod },
-                { label: "経験領域", value: candidate.experienceArea },
-                { label: "経験年数", value: `${candidate.experienceYears}年` },
-              ]}
-            />
-            <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
-              詳細な職務経歴の編集は次のPhaseで実装予定です
-            </div>
-          </SectionCard>
+          <CandidateExperiences candidateId={candidate.id} />
         ) : null}
         {activeTab === "求人・選考" ? (
-          <CandidateApplications candidateId={candidate.id} />
+          <CandidateApplications
+            candidateId={candidate.id}
+            initiallyAdding={applicationComposer > 0}
+            key={`${candidate.id}-applications-${applicationComposer}`}
+          />
         ) : null}
         {activeTab === "タスク" ? (
-          <CandidateTasks candidateId={candidate.id} />
+          <CandidateTasks
+            candidateId={candidate.id}
+            initiallyAdding={taskComposer > 0}
+            key={`${candidate.id}-tasks-${taskComposer}`}
+          />
         ) : null}
         {activeTab === "ファイル" ? (
-          <SectionCard title="ファイル">
-            <EmptyState message="ファイルアップロードは次のPhaseで実装予定です" />
-          </SectionCard>
+          <EntityFiles target={{ candidateId: candidate.id }} />
         ) : null}
         {activeTab === "AI" ? <CandidateAi candidateId={candidate.id} /> : null}
       </div>

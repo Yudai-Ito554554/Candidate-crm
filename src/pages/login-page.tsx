@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -88,12 +88,20 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label
-              className="text-xs font-medium text-slate-700"
-              htmlFor="password"
-            >
-              パスワード
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <label
+                className="text-xs font-medium text-slate-700"
+                htmlFor="password"
+              >
+                パスワード
+              </label>
+              <Link
+                className="text-xs font-medium text-blue-700 hover:underline"
+                to="/forgot-password"
+              >
+                パスワードを忘れた場合
+              </Link>
+            </div>
             <Input
               autoComplete="current-password"
               className="mt-1"

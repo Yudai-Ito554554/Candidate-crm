@@ -1,4 +1,9 @@
-export const mockToday = "2026-08-03";
+export function getLocalDateString(date = new Date()) {
+  const localDate = new Date(
+    date.getTime() - date.getTimezoneOffset() * 60_000,
+  );
+  return localDate.toISOString().slice(0, 10);
+}
 
 export function formatDate(date: string) {
   if (!date || date === "-") return "-";
@@ -6,10 +11,13 @@ export function formatDate(date: string) {
   return `${year}/${month}/${day}`;
 }
 
-export function formatSalary(min: number, max?: number) {
-  return max ? `${min}〜${max}万円` : `${min}万円`;
+export function isOverdueDate(
+  date: string,
+  today = getLocalDateString(),
+): boolean {
+  return date !== "-" && date < today;
 }
 
-export function isOverdue(date: string, completed = false) {
-  return !completed && date < mockToday;
+export function formatSalary(min: number, max?: number) {
+  return max ? `${min}〜${max}万円` : `${min}万円`;
 }

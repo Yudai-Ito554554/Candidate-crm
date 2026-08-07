@@ -1,12 +1,11 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 
 import { AppLayout } from "@/components/layout/app-layout";
+import { EditorRoute } from "@/features/access/editor-route";
 import { ProtectedRoute } from "@/features/auth/protected-route";
-import { CandidatesPage } from "@/pages/candidates-page";
-import { DashboardPage } from "@/pages/dashboard-page";
-import { JobsPage } from "@/pages/jobs-page";
 import { LoginPage } from "@/pages/login-page";
-import { PipelinePage } from "@/pages/pipeline-page";
+import { NotFoundPage } from "@/pages/not-found-page";
+import { RouteErrorPage } from "@/pages/route-error-page";
 
 const routeLoadingElement = (
   <main className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
@@ -15,17 +14,49 @@ const routeLoadingElement = (
 );
 
 export const appRoutes: RouteObject[] = [
-  { path: "/login", element: <LoginPage /> },
+  {
+    path: "/login",
+    element: <LoginPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "/forgot-password",
+    lazy: async () => ({
+      Component: (await import("@/pages/forgot-password-page"))
+        .ForgotPasswordPage,
+    }),
+    errorElement: <RouteErrorPage />,
+  },
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorPage />,
     children: [
+      {
+        path: "/set-password",
+        lazy: async () => ({
+          Component: (await import("@/pages/set-password-page"))
+            .SetPasswordPage,
+        }),
+      },
       {
         path: "/",
         element: <AppLayout />,
+        errorElement: <RouteErrorPage />,
         hydrateFallbackElement: routeLoadingElement,
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: "candidates", element: <CandidatesPage /> },
+          {
+            index: true,
+            lazy: async () => ({
+              Component: (await import("@/pages/dashboard-page")).DashboardPage,
+            }),
+          },
+          {
+            path: "candidates",
+            lazy: async () => ({
+              Component: (await import("@/pages/candidates-page"))
+                .CandidatesPage,
+            }),
+          },
           {
             path: "candidates/:candidateId",
             lazy: async () => ({
@@ -33,12 +64,30 @@ export const appRoutes: RouteObject[] = [
                 .CandidateDetailPage,
             }),
           },
-          { path: "jobs", element: <JobsPage /> },
+          {
+            path: "jobs",
+            lazy: async () => ({
+              Component: (await import("@/pages/jobs-page")).JobsPage,
+            }),
+          },
           {
             path: "jobs/:jobId",
             lazy: async () => ({
               Component: (await import("@/pages/job-detail-page"))
                 .JobDetailPage,
+            }),
+          },
+          {
+            path: "companies",
+            lazy: async () => ({
+              Component: (await import("@/pages/companies-page")).CompaniesPage,
+            }),
+          },
+          {
+            path: "companies/:companyId",
+            lazy: async () => ({
+              Component: (await import("@/pages/company-detail-page"))
+                .CompanyDetailPage,
             }),
           },
           {
@@ -60,7 +109,12 @@ export const appRoutes: RouteObject[] = [
             }),
           },
           // Phase 2 compatibility alias. The pipeline is now switched from /candidates.
-          { path: "pipeline", element: <PipelinePage /> },
+          {
+            path: "pipeline",
+            lazy: async () => ({
+              Component: (await import("@/pages/pipeline-page")).PipelinePage,
+            }),
+          },
           {
             path: "tasks",
             lazy: async () => ({
@@ -73,6 +127,54 @@ export const appRoutes: RouteObject[] = [
               Component: (await import("@/pages/settings-page")).SettingsPage,
             }),
           },
+          {
+            element: <EditorRoute />,
+            children: [
+              {
+                path: "candidates/new",
+                lazy: async () => ({
+                  Component: (await import("@/pages/candidate-form-page"))
+                    .CandidateFormPage,
+                }),
+              },
+              {
+                path: "candidates/:candidateId/edit",
+                lazy: async () => ({
+                  Component: (await import("@/pages/candidate-form-page"))
+                    .CandidateFormPage,
+                }),
+              },
+              {
+                path: "jobs/new",
+                lazy: async () => ({
+                  Component: (await import("@/pages/job-form-page"))
+                    .JobFormPage,
+                }),
+              },
+              {
+                path: "jobs/:jobId/edit",
+                lazy: async () => ({
+                  Component: (await import("@/pages/job-form-page"))
+                    .JobFormPage,
+                }),
+              },
+              {
+                path: "companies/new",
+                lazy: async () => ({
+                  Component: (await import("@/pages/company-form-page"))
+                    .CompanyFormPage,
+                }),
+              },
+              {
+                path: "companies/:companyId/edit",
+                lazy: async () => ({
+                  Component: (await import("@/pages/company-form-page"))
+                    .CompanyFormPage,
+                }),
+              },
+            ],
+          },
+          { path: "*", element: <NotFoundPage /> },
         ],
       },
     ],

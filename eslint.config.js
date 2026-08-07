@@ -5,7 +5,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri/target"] },
+  {
+    ignores: ["dist", "src-tauri/target", "src/types/database.generated.ts"],
+  },
   {
     extends: [
       js.configs.recommended,
@@ -30,6 +32,16 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+    },
+  },
+  {
+    files: ["supabase/functions/**/*.ts"],
+    languageOptions: {
+      globals: { ...globals.browser, Deno: "readonly" },
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.edge.json",
+      },
     },
   },
 );

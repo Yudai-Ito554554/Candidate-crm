@@ -8,8 +8,6 @@ import {
   CheckSquare2,
   Home,
   Inbox,
-  Plus,
-  Search,
   Settings,
   LogOut,
   UserRound,
@@ -17,10 +15,12 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { PlannedButton } from "@/components/common/planned-button";
-import { Input } from "@/components/ui/input";
+import { GlobalSearch } from "@/components/layout/global-search";
+import { ConnectivityBanner } from "@/components/layout/connectivity-banner";
+import { GlobalCreateMenu } from "@/components/layout/global-create-menu";
+import { EditorOnly } from "@/features/access/editor-only";
+import { useAccess } from "@/features/access/use-access";
 import { useAuth } from "@/features/auth/use-auth";
-import { currentUser } from "@/data/mock-data";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -35,6 +35,8 @@ const navItems = [
 ] as const;
 
 function getPageTitle(pathname: string) {
+  if (/^\/companies\/[^/]+$/.test(pathname)) return "企業詳細";
+  if (pathname.startsWith("/companies")) return "企業管理";
   if (/^\/candidates\/.+/.test(pathname)) return "候補者詳細";
   if (/^\/jobs\/.+/.test(pathname)) return "求人詳細";
   return (
@@ -46,13 +48,70 @@ function getPageTitle(pathname: string) {
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const auth = useAuth();
+  const access = useAccess();
   const location = useLocation();
   const pageTitle = useMemo(
     () => getPageTitle(location.pathname),
     [location.pathname],
   );
-  const userLabel = auth.user?.email ?? currentUser;
+  const userLabel = auth.user?.email ?? "ログインユーザー";
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+    setLogoutError(null);
+    const succeeded = await auth.signOut();
+    if (!succeeded) {
+      setLogoutError(
+        auth.errorMessage ??
+          "ログアウトに失敗しました。時間を置いて再度お試しください。",
+      );
+    }
+    setIsSigningOut(false);
+  }
+
+  if (access.isPending) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <p className="text-sm text-slate-600" role="status">
+          アクセス権限を確認しています…
+        </p>
+      </main>
+    );
+  }
+
+  if (access.role === "pending" || access.role === null) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <section
+          className="w-full max-w-md rounded-lg border border-amber-200 bg-white p-6 shadow-sm"
+          role="alert"
+        >
+          <h1 className="text-lg font-semibold text-slate-950">
+            利用承認をお待ちください
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            このアカウントはまだCandidate
+            CRMの利用を承認されていません。管理者へ承認を依頼してください。
+          </p>
+          <p className="mt-3 text-xs text-slate-500">{userLabel}</p>
+          {logoutError ? (
+            <p className="mt-3 text-sm text-rose-700">{logoutError}</p>
+          ) : null}
+          <button
+            className="mt-5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            disabled={isSigningOut}
+            onClick={() => void handleSignOut()}
+            type="button"
+          >
+            {isSigningOut ? "ログアウト中…" : "ログアウト"}
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -129,20 +188,11 @@ export function AppLayout() {
             </h1>
           </div>
           <div className="relative max-w-xl flex-1">
-            <Search
-              aria-hidden="true"
-              className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-            />
-            <Input
-              aria-label="全体検索"
-              className="h-9 border-slate-200 bg-slate-50 pl-9"
-              placeholder="候補者・企業・求人を検索"
-            />
+            <GlobalSearch />
           </div>
-          <PlannedButton className="h-9 gap-2" size="sm">
-            <Plus className="size-4" />
-            新規登録
-          </PlannedButton>
+          <EditorOnly>
+            <GlobalCreateMenu />
+          </EditorOnly>
           <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
             <div className="flex size-8 items-center justify-center rounded-full bg-slate-100">
               <UserRound className="size-4 text-slate-600" />
@@ -153,7 +203,8 @@ export function AppLayout() {
             <button
               aria-label="ログアウト"
               className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-              onClick={() => void auth.signOut()}
+              disabled={isSigningOut}
+              onClick={() => void handleSignOut()}
               title="ログアウト"
               type="button"
             >
@@ -161,7 +212,24 @@ export function AppLayout() {
             </button>
           </div>
         </header>
+        {logoutError ? (
+          <div
+            className="border-b border-rose-200 bg-rose-50 px-5 py-2 text-sm text-rose-800"
+            role="alert"
+          >
+            {logoutError}
+          </div>
+        ) : null}
+        <ConnectivityBanner />
         <main className="min-w-0 p-5">
+          {access.role === "viewer" ? (
+            <div
+              className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900"
+              role="status"
+            >
+              閲覧専用モード：データの追加・変更・アーカイブはできません。
+            </div>
+          ) : null}
           <Outlet />
         </main>
       </div>

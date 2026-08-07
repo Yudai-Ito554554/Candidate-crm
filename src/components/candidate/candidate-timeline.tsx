@@ -1,21 +1,37 @@
 import {
+  Archive,
   BriefcaseBusiness,
   CheckSquare2,
   Mail,
   MessageSquare,
+  Pencil,
   Phone,
-  Paperclip,
+  Plus,
   Video,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { getJob } from "@/data/mock-data";
-import { getCandidateTimeline } from "@/data/workspace-data";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { EditorOnly } from "@/features/access/editor-only";
+import {
+  useCompaniesQuery,
+  useJobsQuery,
+} from "@/features/applications/application-queries";
+import { useProfilesQuery } from "@/features/candidates/candidate-queries";
+import { ActivityForm } from "@/features/work/activity-form";
+import { activityTypeLabels } from "@/features/work/work-model";
+import {
+  useArchiveActivityMutation,
+  useCandidateActivitiesQuery,
+} from "@/features/work/work-queries";
+import { getLocalDateString } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { TimelineCategory, TimelineEventType } from "@/types";
+import type { ActivityRow, ActivityType } from "@/types/database";
 
-type TimelineFilter = "すべて" | TimelineCategory;
+type TimelineFilter =
+  "すべて" | "メール" | "面談・電話" | "求人・選考" | "タスク・メモ";
 const filters: TimelineFilter[] = [
   "すべて",
   "メール",
@@ -23,47 +39,75 @@ const filters: TimelineFilter[] = [
   "求人・選考",
   "タスク・メモ",
 ];
-
-function eventIcon(type: TimelineEventType) {
-  if (type.includes("メール")) return Mail;
-  if (type === "Zoom面談" || type === "面接") return Video;
-  if (type === "電話") return Phone;
-  if (type === "タスク作成") return CheckSquare2;
+function category(type: ActivityType): TimelineFilter {
+  if (["email_sent", "email_received"].includes(type)) return "メール";
+  if (["interview", "phone", "meeting"].includes(type)) return "面談・電話";
   if (
     [
-      "求人提案",
-      "応募意思確認",
-      "応募",
-      "書類提出",
-      "企業確認",
-      "選考結果",
+      "job_proposed",
+      "intention_confirmed",
+      "application",
+      "document_submitted",
+      "company_contact",
+      "interview_scheduled",
+      "selection_result",
     ].includes(type)
   )
-    return BriefcaseBusiness;
+    return "求人・選考";
+  return "タスク・メモ";
+}
+function eventIcon(type: ActivityType) {
+  if (type.includes("email")) return Mail;
+  if (["interview", "meeting", "interview_scheduled"].includes(type))
+    return Video;
+  if (type === "phone") return Phone;
+  if (type === "task") return CheckSquare2;
+  if (category(type) === "求人・選考") return BriefcaseBusiness;
   return MessageSquare;
 }
-
 function dateLabel(date: string) {
-  if (date === "2026-08-03") return "今日";
-  if (date === "2026-08-02") return "昨日";
+  const today = getLocalDateString();
+  const yesterday = getLocalDateString(new Date(Date.now() - 86_400_000));
+  if (date === today) return "今日";
+  if (date === yesterday) return "昨日";
   const [year, month, day] = date.split("-");
   return `${year}年${Number(month)}月${Number(day)}日`;
 }
 
-export function CandidateTimeline({ candidateId }: { candidateId: string }) {
+export function CandidateTimeline({
+  candidateId,
+  initiallyAdding = false,
+}: {
+  candidateId: string;
+  initiallyAdding?: boolean;
+}) {
+  const query = useCandidateActivitiesQuery(candidateId);
+  const jobsQuery = useJobsQuery();
+  const companiesQuery = useCompaniesQuery();
+  const profilesQuery = useProfilesQuery();
+  const archiveMutation = useArchiveActivityMutation(candidateId);
   const [filter, setFilter] = useState<TimelineFilter>("すべて");
-  const events = getCandidateTimeline(candidateId).filter(
-    (event) => filter === "すべて" || event.category === filter,
+  const [editing, setEditing] = useState<ActivityRow | "new" | null>(
+    initiallyAdding ? "new" : null,
+  );
+  const jobs = new Map((jobsQuery.data ?? []).map((item) => [item.id, item]));
+  const companies = new Map(
+    (companiesQuery.data ?? []).map((item) => [item.id, item]),
+  );
+  const profiles = new Map(
+    (profilesQuery.data ?? []).map((item) => [item.id, item]),
+  );
+  const events = (query.data ?? []).filter(
+    (event) => filter === "すべて" || category(event.activity_type) === filter,
   );
   const grouped = useMemo(() => {
-    const groups = new Map<string, typeof events>();
+    const groups = new Map<string, ActivityRow[]>();
     for (const event of events) {
-      const date = event.occurredAt.slice(0, 10);
+      const date = event.occurred_at.slice(0, 10);
       groups.set(date, [...(groups.get(date) ?? []), event]);
     }
     return [...groups.entries()];
   }, [events]);
-
   return (
     <section
       aria-label="候補者タイムライン"
@@ -76,86 +120,147 @@ export function CandidateTimeline({ candidateId }: { candidateId: string }) {
             活動、メール、選考、タスクを時系列で統合しています
           </p>
         </div>
-        <div
-          className="flex flex-wrap gap-1"
-          role="group"
-          aria-label="タイムライン絞り込み"
-        >
-          {filters.map((item) => (
-            <button
-              aria-pressed={filter === item}
-              className={cn(
-                "rounded-md px-2.5 py-1.5 text-xs font-medium",
-                filter === item
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-              )}
-              key={item}
-              onClick={() => setFilter(item)}
-              type="button"
+        <div className="flex items-center gap-2">
+          <div
+            aria-label="タイムライン絞り込み"
+            className="flex flex-wrap gap-1"
+            role="group"
+          >
+            {filters.map((item) => (
+              <button
+                aria-pressed={filter === item}
+                className={cn(
+                  "rounded-md px-2.5 py-1.5 text-xs font-medium",
+                  filter === item
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                )}
+                key={item}
+                onClick={() => setFilter(item)}
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <EditorOnly>
+            <Button
+              aria-label="タイムラインに活動を追加"
+              className="gap-1.5"
+              onClick={() => setEditing("new")}
+              size="sm"
             >
-              {item}
-            </button>
-          ))}
+              <Plus className="size-4" />
+              活動追加
+            </Button>
+          </EditorOnly>
         </div>
       </div>
-      <div className="p-4">
-        {grouped.map(([date, dateEvents]) => (
-          <div className="mb-5 last:mb-0" key={date}>
-            <div className="mb-2 flex items-center gap-2">
-              <h3 className="text-xs font-semibold text-slate-700">
-                {dateLabel(date)}
-              </h3>
-              <span className="h-px flex-1 bg-slate-100" />
-            </div>
-            <ol className="space-y-2">
-              {dateEvents.map((event) => {
-                const Icon = eventIcon(event.type);
-                const job = event.jobId ? getJob(event.jobId) : undefined;
-                return (
-                  <li
-                    className="grid grid-cols-[52px_30px_minmax(0,1fr)] gap-2"
-                    key={event.id}
-                  >
-                    <time className="pt-2 text-xs tabular-nums text-slate-500">
-                      {event.occurredAt.slice(11)}
-                    </time>
-                    <span className="mt-1 flex size-7 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-                      <Icon className="size-3.5" />
-                    </span>
-                    <article className="rounded-md border border-slate-200 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <Badge value={event.type} />
-                          <h4 className="truncate text-sm font-semibold text-slate-900">
-                            {event.title}
-                          </h4>
+      <div className="space-y-4 p-4">
+        {editing ? (
+          <ActivityForm
+            activity={editing === "new" ? undefined : editing}
+            candidateId={candidateId}
+            onClose={() => setEditing(null)}
+          />
+        ) : null}
+        {query.isPending ? (
+          <p className="py-8 text-center text-sm text-slate-500">
+            活動を読み込んでいます…
+          </p>
+        ) : query.isError ? (
+          <EmptyState message={query.error.message} />
+        ) : grouped.length ? (
+          grouped.map(([date, dateEvents]) => (
+            <div className="mb-5 last:mb-0" key={date}>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-slate-700">
+                  {dateLabel(date)}
+                </h3>
+                <span className="h-px flex-1 bg-slate-100" />
+              </div>
+              <ol className="space-y-2">
+                {dateEvents.map((event) => {
+                  const Icon = eventIcon(event.activity_type);
+                  const job = event.job_id ? jobs.get(event.job_id) : undefined;
+                  const company = job
+                    ? companies.get(job.company_id)
+                    : undefined;
+                  return (
+                    <li
+                      className="grid grid-cols-[52px_30px_minmax(0,1fr)] gap-2"
+                      key={event.id}
+                    >
+                      <time className="pt-2 text-xs tabular-nums text-slate-500">
+                        {event.occurred_at.slice(11, 16)}
+                      </time>
+                      <span className="mt-1 flex size-7 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                        <Icon className="size-3.5" />
+                      </span>
+                      <article className="rounded-md border border-slate-200 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Badge
+                              value={activityTypeLabels[event.activity_type]}
+                            />
+                            {event.ai_generated ? (
+                              <Badge value="AI生成" />
+                            ) : null}
+                            <h4 className="truncate text-sm font-semibold text-slate-900">
+                              {event.title}
+                            </h4>
+                          </div>
+                          <EditorOnly>
+                            <div className="flex gap-1">
+                              <Button
+                                aria-label={`${event.title}を編集`}
+                                onClick={() => setEditing(event)}
+                                size="sm"
+                                variant="outline"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
+                              <Button
+                                aria-label={`${event.title}をアーカイブ`}
+                                className="text-rose-700"
+                                disabled={archiveMutation.isPending}
+                                onClick={() => archiveMutation.mutate(event.id)}
+                                size="sm"
+                                variant="outline"
+                              >
+                                <Archive className="size-3.5" />
+                              </Button>
+                            </div>
+                          </EditorOnly>
                         </div>
-                        {event.hasAttachment ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-slate-500">
-                            <Paperclip className="size-3" />
-                            添付あり
-                          </span>
+                        {event.body ? (
+                          <p className="mt-1.5 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                            {event.body}
+                          </p>
                         ) : null}
-                      </div>
-                      <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
-                        {event.content}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-                        <span>担当：{event.owner}</span>
-                        {job ? (
+                        <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500">
                           <span>
-                            関連：{job.company} / {job.title}
+                            担当：
+                            {profiles.get(event.owner_id ?? "")?.display_name ??
+                              "未設定"}
                           </span>
-                        ) : null}
-                      </div>
-                    </article>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        ))}
+                          {job ? (
+                            <span>
+                              関連：{company?.name ?? "企業未登録"} /{" "}
+                              {job.title}
+                            </span>
+                          ) : null}
+                        </div>
+                      </article>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))
+        ) : (
+          <EmptyState message={`${filter}の活動はありません`} />
+        )}
       </div>
     </section>
   );
