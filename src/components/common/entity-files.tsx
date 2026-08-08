@@ -5,7 +5,7 @@ import {
   LoaderCircle,
   Upload,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -46,6 +46,15 @@ export function EntityFiles({ target }: { target: FileTarget }) {
   const [message, setMessage] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [pendingArchive, setPendingArchive] = useState<FileRow | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const archiveTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!pendingArchive) return;
+    dialogRef.current
+      ?.querySelector<HTMLButtonElement>('[data-dialog-initial-focus="true"]')
+      ?.focus();
+  }, [pendingArchive]);
 
   async function handleUpload() {
     if (!selectedFile || !user) return;
@@ -89,18 +98,47 @@ export function EntityFiles({ target }: { target: FileTarget }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
-  function handleArchive(file: FileRow) {
+  function handleArchive(file: FileRow, trigger: HTMLButtonElement) {
+    archiveTriggerRef.current = trigger;
     setPendingArchive(file);
+  }
+
+  function closeArchiveDialog() {
+    setPendingArchive(null);
+    archiveTriggerRef.current?.focus();
+    archiveTriggerRef.current = null;
   }
 
   function confirmArchive() {
     if (!pendingArchive) return;
     const file = pendingArchive;
-    setPendingArchive(null);
     setMessage(null);
     archiveMutation.mutate(file.id, {
       onError: (error) => setMessage(error.message),
     });
+    closeArchiveDialog();
+  }
+
+  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeArchiveDialog();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable || focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   return (
@@ -232,7 +270,9 @@ export function EntityFiles({ target }: { target: FileTarget }) {
                             aria-label={`${file.file_name}をアーカイブ`}
                             className="h-8 px-2 text-rose-700"
                             disabled={archiveMutation.isPending}
-                            onClick={() => handleArchive(file)}
+                            onClick={(event) =>
+                              handleArchive(file, event.currentTarget)
+                            }
                             size="sm"
                             type="button"
                             variant="outline"
@@ -255,17 +295,27 @@ export function EntityFiles({ target }: { target: FileTarget }) {
       </section>
       {pendingArchive ? (
         <div
+          aria-labelledby="file-archive-dialog-title"
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onKeyDown={handleDialogKeyDown}
+          ref={dialogRef}
           role="dialog"
         >
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-            <p className="text-sm text-slate-700">
+            <h2
+              className="text-sm font-semibold text-slate-900"
+              id="file-archive-dialog-title"
+            >
+              ファイルの除外確認
+            </h2>
+            <p className="mt-1 text-sm text-slate-700">
               {pendingArchive.file_name}を一覧から除外しますか？
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <Button
-                onClick={() => setPendingArchive(null)}
+                data-dialog-initial-focus="true"
+                onClick={closeArchiveDialog}
                 size="sm"
                 type="button"
                 variant="outline"
