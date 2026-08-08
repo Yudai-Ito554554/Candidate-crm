@@ -45,6 +45,7 @@ export function EntityFiles({ target }: { target: FileTarget }) {
   );
   const [message, setMessage] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [pendingArchive, setPendingArchive] = useState<FileRow | null>(null);
 
   async function handleUpload() {
     if (!selectedFile || !user) return;
@@ -89,7 +90,13 @@ export function EntityFiles({ target }: { target: FileTarget }) {
   }
 
   function handleArchive(file: FileRow) {
-    if (!window.confirm(`${file.file_name}を一覧から除外しますか？`)) return;
+    setPendingArchive(file);
+  }
+
+  function confirmArchive() {
+    if (!pendingArchive) return;
+    const file = pendingArchive;
+    setPendingArchive(null);
     setMessage(null);
     archiveMutation.mutate(file.id, {
       onError: (error) => setMessage(error.message),
@@ -97,153 +104,181 @@ export function EntityFiles({ target }: { target: FileTarget }) {
   }
 
   return (
-    <section
-      aria-label="ファイル管理"
-      className="rounded-lg border border-slate-200 bg-white shadow-sm"
-    >
-      <EditorOnly>
-        <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
-          <div className="min-w-48">
-            <label
-              className="mb-1 block text-xs font-medium text-slate-600"
-              htmlFor="file-category"
+    <>
+      <section
+        aria-label="ファイル管理"
+        className="rounded-lg border border-slate-200 bg-white shadow-sm"
+      >
+        <EditorOnly>
+          <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
+            <div className="min-w-48">
+              <label
+                className="mb-1 block text-xs font-medium text-slate-600"
+                htmlFor="file-category"
+              >
+                種別
+              </label>
+              <Select
+                id="file-category"
+                onChange={(event) =>
+                  setCategory(event.target.value as FileCategory)
+                }
+                value={category}
+              >
+                {fileCategories.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="min-w-64 flex-1">
+              <label
+                className="mb-1 block text-xs font-medium text-slate-600"
+                htmlFor="crm-file"
+              >
+                ファイル
+              </label>
+              <input
+                accept={acceptedCrmFileTypes}
+                className="block h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:border-0 file:bg-transparent file:text-xs file:font-medium"
+                id="crm-file"
+                key={selectedFile?.name ?? "empty"}
+                onChange={(event) => {
+                  setSelectedFile(event.target.files?.[0] ?? null);
+                  setMessage(null);
+                }}
+                type="file"
+              />
+            </div>
+            <Button
+              className="h-9 gap-1.5"
+              disabled={!selectedFile || !user || uploadMutation.isPending}
+              onClick={() => void handleUpload()}
+              type="button"
             >
-              種別
-            </label>
-            <Select
-              id="file-category"
-              onChange={(event) =>
-                setCategory(event.target.value as FileCategory)
-              }
-              value={category}
-            >
-              {fileCategories.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="min-w-64 flex-1">
-            <label
-              className="mb-1 block text-xs font-medium text-slate-600"
-              htmlFor="crm-file"
-            >
-              ファイル
-            </label>
-            <input
-              accept={acceptedCrmFileTypes}
-              className="block h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:border-0 file:bg-transparent file:text-xs file:font-medium"
-              id="crm-file"
-              key={selectedFile?.name ?? "empty"}
-              onChange={(event) => {
-                setSelectedFile(event.target.files?.[0] ?? null);
-                setMessage(null);
-              }}
-              type="file"
-            />
-          </div>
-          <Button
-            className="h-9 gap-1.5"
-            disabled={!selectedFile || !user || uploadMutation.isPending}
-            onClick={() => void handleUpload()}
-            type="button"
-          >
-            {uploadMutation.isPending ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Upload className="size-4" />
-            )}
-            アップロード
-          </Button>
-          <p className="w-full text-xs text-slate-500">
-            PDF・Word・JPEG・PNG、10MB以下。保存先は非公開です。
-          </p>
-          {message ? (
-            <p
-              aria-live="polite"
-              className="w-full text-sm text-slate-700"
-              role="status"
-            >
-              {message}
+              {uploadMutation.isPending ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Upload className="size-4" />
+              )}
+              アップロード
+            </Button>
+            <p className="w-full text-xs text-slate-500">
+              PDF・Word・JPEG・PNG、10MB以下。保存先は非公開です。
             </p>
-          ) : null}
-        </div>
-      </EditorOnly>
+            {message ? (
+              <p
+                aria-live="polite"
+                className="w-full text-sm text-slate-700"
+                role="status"
+              >
+                {message}
+              </p>
+            ) : null}
+          </div>
+        </EditorOnly>
 
-      {query.isPending ? (
-        <p className="py-10 text-center text-sm text-slate-500">
-          ファイルを読み込んでいます…
-        </p>
-      ) : query.isError ? (
-        <div className="p-4">
-          <EmptyState message={query.error.message} />
-        </div>
-      ) : query.data.length ? (
-        <TableContainer className="border-0 shadow-none">
-          <Table>
-            <thead>
-              <tr>
-                <Th>ファイル名</Th>
-                <Th>種別</Th>
-                <Th>サイズ</Th>
-                <Th>追加日</Th>
-                <Th>操作</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data.map((file) => (
-                <tr key={file.id}>
-                  <Td>
-                    <span className="flex min-w-0 items-center gap-2 font-medium">
-                      <FileText className="size-4 shrink-0 text-blue-600" />
-                      <span className="break-all">{file.file_name}</span>
-                    </span>
-                  </Td>
-                  <Td>{fileCategoryLabels[file.category]}</Td>
-                  <Td className="tabular-nums">
-                    {formatFileSize(file.file_size)}
-                  </Td>
-                  <Td>{formatDate(file.created_at.slice(0, 10))}</Td>
-                  <Td>
-                    <div className="flex gap-1.5">
-                      <Button
-                        aria-label={`${file.file_name}をダウンロード`}
-                        className="h-8 gap-1 px-2"
-                        disabled={downloadingId === file.id}
-                        onClick={() => void handleDownload(file)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <Download className="size-3.5" />
-                        保存
-                      </Button>
-                      <EditorOnly>
+        {query.isPending ? (
+          <p className="py-10 text-center text-sm text-slate-500">
+            ファイルを読み込んでいます…
+          </p>
+        ) : query.isError ? (
+          <div className="p-4">
+            <EmptyState message={query.error.message} />
+          </div>
+        ) : query.data.length ? (
+          <TableContainer className="border-0 shadow-none">
+            <Table>
+              <thead>
+                <tr>
+                  <Th>ファイル名</Th>
+                  <Th>種別</Th>
+                  <Th>サイズ</Th>
+                  <Th>追加日</Th>
+                  <Th>操作</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {query.data.map((file) => (
+                  <tr key={file.id}>
+                    <Td>
+                      <span className="flex min-w-0 items-center gap-2 font-medium">
+                        <FileText className="size-4 shrink-0 text-blue-600" />
+                        <span className="break-all">{file.file_name}</span>
+                      </span>
+                    </Td>
+                    <Td>{fileCategoryLabels[file.category]}</Td>
+                    <Td className="tabular-nums">
+                      {formatFileSize(file.file_size)}
+                    </Td>
+                    <Td>{formatDate(file.created_at.slice(0, 10))}</Td>
+                    <Td>
+                      <div className="flex gap-1.5">
                         <Button
-                          aria-label={`${file.file_name}をアーカイブ`}
-                          className="h-8 px-2 text-rose-700"
-                          disabled={archiveMutation.isPending}
-                          onClick={() => handleArchive(file)}
+                          aria-label={`${file.file_name}をダウンロード`}
+                          className="h-8 gap-1 px-2"
+                          disabled={downloadingId === file.id}
+                          onClick={() => void handleDownload(file)}
                           size="sm"
                           type="button"
                           variant="outline"
                         >
-                          <Archive className="size-3.5" />
+                          <Download className="size-3.5" />
+                          保存
                         </Button>
-                      </EditorOnly>
-                    </div>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableContainer>
-      ) : (
-        <div className="p-4">
-          <EmptyState message="登録されたファイルはありません" />
+                        <EditorOnly>
+                          <Button
+                            aria-label={`${file.file_name}をアーカイブ`}
+                            className="h-8 px-2 text-rose-700"
+                            disabled={archiveMutation.isPending}
+                            onClick={() => handleArchive(file)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <Archive className="size-3.5" />
+                          </Button>
+                        </EditorOnly>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <div className="p-4">
+            <EmptyState message="登録されたファイルはありません" />
+          </div>
+        )}
+      </section>
+      {pendingArchive ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+        >
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
+            <p className="text-sm text-slate-700">
+              {pendingArchive.file_name}を一覧から除外しますか？
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                onClick={() => setPendingArchive(null)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                キャンセル
+              </Button>
+              <Button onClick={confirmArchive} size="sm" type="button">
+                除外する
+              </Button>
+            </div>
+          </div>
         </div>
-      )}
-    </section>
+      ) : null}
+    </>
   );
 }
