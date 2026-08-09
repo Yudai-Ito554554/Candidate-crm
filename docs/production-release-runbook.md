@@ -1,9 +1,11 @@
 # Candidate CRM 本番移行Runbook
 
-最終更新: 2026-08-09（Asia/Tokyo、レビュー反映版3）
-Release Candidate: `dc8bd81`（`main`ブランチ、`origin/main`と同期済み）
+最終更新: 2026-08-10（Asia/Tokyo、本番Stage 1実施結果を反映）
+Release Candidate baseline: `aba26b5`（`main`ブランチ）
 
-このRunbookは、非本番Supabase（`candidate-crm-staging` / project ref `admjgbfrfoczpxdtxmgy`）でのUATを踏まえ、本番Supabase（`candidate-crm` / project ref `dsaqarejqslzgcatkxeh`）へ移行する際の手順書です。この文書自体の作成時点では、production・productionデータへの変更は一切行っていません。
+このRunbookは、非本番Supabase（`candidate-crm-staging` / project ref `admjgbfrfoczpxdtxmgy`）でのUATを踏まえ、本番Supabase（`candidate-crm` / project ref `dsaqarejqslzgcatkxeh`）へ移行する際の手順書です。
+
+> **実施記録（2026-08-10）:** Stage 1は完了しています。対象2migrationはproductionへ適用済みで、列権限、全publicテーブル件数、Storageメタデータ、Advisorを適用前後で検証済みです。本RunbookのStage 1適用手順を同じproductionへ再実行しないでください。以降のリリースでは`migration list --linked`と`db push --dry-run`から未適用差分を毎回動的に確認します。
 
 実際に本番操作を行う担当者は、実施前に必ず [`docs/production-go-no-go-checklist.md`](./production-go-no-go-checklist.md) を確認し、実施しようとしている段階（Stage 1〜3）の重大項目がすべて満たされていることを確認してください。
 
@@ -19,7 +21,7 @@ Release Candidate: `dc8bd81`（`main`ブランチ、`origin/main`と同期済み
 - CLIは `SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 <command>` の形式で実行してください。CLI 2.112.0には`projects list`のAPIレスポンス解析で失敗するバグを確認しています（本セッションで検証済み）。バージョンは実行時点の最新安定版を都度 `--version` で確認し、問題があれば2.111.0へ固定してください。本Runbook中のコマンドはすべて2.111.0の`--help`出力、または該当コマンドの実行結果で構文を確認済みです（推測で書いたコマンドはありません）。
 - Supabase CLIの`db query`・`db push`・`functions deploy`・`storage`等は`supabase link --project-ref <ref>`で「リンク」した状態のディレクトリに対して`--linked`フラグで実行します。**開発用のメインリポジトリを直接productionへリンクしないでください。** 誤操作時に`db push`等が本番へ向いてしまうリスクがあるためです。本番操作は本Runbookの「1. 誤接続防止チェック」の隔離手順に従ってください。
 - `supabase storage`のサブコマンド（`ls`/`cp`）は、`--help`のフラグ一覧には明記されていませんが、実行時に`--experimental`フラグを必須で要求します（本セッションでstaging環境に対し実行し、`--experimental`なしでは`LegacyExperimentalRequiredError`になることを確認済み）。本Runbookのstorageコマンドには`--experimental`を含めています。
-- **バックアップ用ディレクトリ（productionへlink）と、restore drill用ディレクトリ（productionへは絶対にlinkしない）は、常に別々のディレクトリです。** 本Runbookでは前者を`/tmp/candidate-crm-prod-release`、後者を`/tmp/candidate-crm-restore-drill`のように明確に区別します。同一ディレクトリを両方の用途に使い回さないでください。
+- **バックアップ用ディレクトリ（productionへlink）と、restore drill用ディレクトリ（productionへは絶対にlinkしない）は、常に別々のディレクトリです。** 本Runbookでは前者を`/tmp/candidate-crm-prod-release`、後者を`$HOME/secure-restore-drills/candidate-crm`として明確に区別します。同一ディレクトリを両方の用途に使い回さないでください。macOSのColima/QEMUではホストの`/tmp`が仮想マシンへ共有されない場合があるため、Docker bind mountを使うローカルdrillを`/tmp`配下に作成しません。
 - 本Runbookのコマンド列は`bash`の`set -euo pipefail`を前提としたシェルスクリプトとして記載しています。**シェバンは全て`#!/usr/bin/env bash`を使用してください（`#!/bin/sh`は環境によって`pipefail`オプション自体をサポートしない場合があり、失敗検知が機能しなくなるため使いません）。** 対話的に1行ずつコピー&ペーストするのではなく、まとまったブロックを1つのスクリプトファイルとして保存してから実行してください。
 - 各スクリプトは、別プロセス・別ターミナルセッションとして実行される前提です。**シェル変数（`BACKUP_DIR`等）は環境変数として引き継がれません。** 2節で作成した`BACKUP_DIR`は、固定パスのポインタファイル（`/tmp/candidate-crm-prod-release/.backup-dir`）へ保存し、3節・4節・6節はそのポインタファイルを読み込んで使用します（詳細は各節を参照）。
 
@@ -37,7 +39,7 @@ Release Candidate: `dc8bd81`（`main`ブランチ、`origin/main`と同期済み
    SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 init --workdir /tmp/candidate-crm-prod-release
    ```
 
-2. migrationファイルを、リリース対象コミット（このRunbookでは`dc8bd81`、または以後承認されたコミット）のリポジトリから隔離ディレクトリへコピーする。
+2. migrationファイルを、承認されたリリース対象コミットのリポジトリから隔離ディレクトリへコピーする。
 
    ```sh
    cp /path/to/candidate-crm/supabase/migrations/*.sql /tmp/candidate-crm-prod-release/supabase/migrations/
@@ -134,9 +136,22 @@ SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 db dump \
   --exclude "storage.vector_indexes" \
   --file "$BACKUP_DIR/data.sql"
 
+# restore drillで「復元後の権限」を適用後の期待値と比較しないよう、
+# バックアップ取得時点（migration適用前）の列権限を基準値として保存する。
+SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 db query --linked \
+  --workdir /tmp/candidate-crm-prod-release \
+  "select table_name, column_name
+   from information_schema.role_column_grants
+   where table_schema = 'public'
+     and table_name in ('email_threads', 'files')
+     and grantee = 'authenticated'
+     and privilege_type = 'UPDATE'
+   order by table_name, column_name;" \
+  > "$BACKUP_DIR/pre-migration-column-grants.json"
+
 # 検証: 3ファイルとも非ゼロサイズであることを確認する。1つでも欠けていれば
 # ここで停止し、以降の節（Storageバックアップ・migration適用）へは進めない。
-for f in roles.sql schema.sql data.sql; do
+for f in roles.sql schema.sql data.sql pre-migration-column-grants.json; do
   path="$BACKUP_DIR/$f"
   if [ ! -s "$path" ]; then
     echo "FATAL: $f is missing or empty. Backup failed." >&2
@@ -144,8 +159,8 @@ for f in roles.sql schema.sql data.sql; do
   fi
 done
 
-chmod 600 "$BACKUP_DIR"/*.sql
-echo "OK: roles.sql / schema.sql / data.sql created"
+chmod 600 "$BACKUP_DIR"/*.sql "$BACKUP_DIR/pre-migration-column-grants.json"
+echo "OK: database dumps and pre-migration grant baseline created"
 
 # 後続の節（migration適用）はこのマーカーの存在を必須条件とする。
 touch "$BACKUP_DIR/.backup-db-ok"
@@ -211,7 +226,26 @@ SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 db query --linked \
   "select count(*) as object_count, coalesce(sum((metadata->>'size')::bigint), 0) as total_bytes from storage.objects where bucket_id = 'crm-files';" \
   > "$BACKUP_DIR/crm-files-metadata-baseline.json"
 
-LISTED_COUNT=$(python3 -c "import json; print(len(json.load(open('$BACKUP_DIR/crm-files-listing.json'))['paths']))")
+LISTED_OBJECT_COUNT=$(python3 - "$BACKUP_DIR/crm-files-listing.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    paths = json.load(source)["paths"]
+print(sum(1 for path in paths if not path.endswith("/")))
+PY
+)
+
+DB_OBJECT_COUNT=$(python3 - "$BACKUP_DIR/crm-files-metadata-baseline.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    payload = json.load(source)
+rows = payload.get("rows", payload)
+print(rows[0]["object_count"])
+PY
+)
 
 # 3.2 ダウンロード
 mkdir -p "$BACKUP_DIR/crm-files"
@@ -221,14 +255,25 @@ SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 storage cp -r \
 
 # 3.3 件数検証
 DOWNLOADED_COUNT=$(find "$BACKUP_DIR/crm-files" -type f | wc -l | tr -d ' ')
-if [ "$DOWNLOADED_COUNT" != "$LISTED_COUNT" ]; then
-  echo "FATAL: downloaded file count ($DOWNLOADED_COUNT) != listed count ($LISTED_COUNT)." >&2
+if [ "$DOWNLOADED_COUNT" != "$LISTED_OBJECT_COUNT" ] || [ "$DOWNLOADED_COUNT" != "$DB_OBJECT_COUNT" ]; then
+  echo "FATAL: downloaded, listed-object, and storage.objects counts do not match." >&2
   exit 1
 fi
 
 # 3.4 チェックサム作成（相対パスで正規化、後でrestore drill側と比較する）
-(cd "$BACKUP_DIR/crm-files" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256) \
-  > "$BACKUP_DIR/crm-files.sha256"
+python3 - "$BACKUP_DIR/crm-files" "$BACKUP_DIR/crm-files.sha256" <<'PY'
+import hashlib
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+output = Path(sys.argv[2])
+lines = []
+for path in sorted(item for item in root.rglob("*") if item.is_file()):
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    lines.append(f"{digest}  {path.relative_to(root).as_posix()}")
+output.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+PY
 
 chmod 600 "$BACKUP_DIR"/crm-files.sha256 "$BACKUP_DIR"/crm-files-listing.json "$BACKUP_DIR"/crm-files-metadata-baseline.json
 find "$BACKUP_DIR/crm-files" -type f -exec chmod 600 {} \;
@@ -237,7 +282,7 @@ echo "OK: $DOWNLOADED_COUNT files downloaded and checksummed"
 touch "$BACKUP_DIR/.backup-storage-ok"
 ```
 
-- ダウンロード件数が一覧件数と一致しない場合はここで停止する。原因を確認してからやり直す。
+- `storage ls -r`の`paths`には末尾が`/`のディレクトリprefixが含まれるため、それを実ファイルとして数えない。ダウンロード件数・一覧の実オブジェクト件数・`storage.objects`件数の3者が一致しない場合は停止する。
 - `crm-files-listing.json`・`crm-files-metadata-baseline.json`・`crm-files.sha256`は、いずれもファイルパス等を含むため`$BACKUP_DIR`内だけに保存し、**チャット・CIログ・Gitへは出力しない。**
 
 **チェック欄**
@@ -246,7 +291,7 @@ touch "$BACKUP_DIR/.backup-storage-ok"
 | ----------------------------------------------------------------------------- | ------ | ------ | ---- |
 | ポインタファイル読み込み・パス検証が成功した                                  |        |        |      |
 | Storageバックアップスクリプトが`OK`まで完走し`.backup-storage-ok`が作成された |        |        |      |
-| ダウンロード件数と一覧件数の一致確認                                          |        |        |      |
+| ダウンロード件数・一覧の実オブジェクト件数・`storage.objects`件数の一致確認   |        |        |      |
 
 ## 4. restore drill（Stage 1の必須項目、migration適用前に実施）
 
@@ -254,7 +299,7 @@ touch "$BACKUP_DIR/.backup-storage-ok"
 
 ### 4.1 隔離の原則と共通関数
 
-- **バックアップ取得に使ったディレクトリ（`/tmp/candidate-crm-prod-release`、productionへlink済み）を、このrestore drillに再利用してはいけません。** 新しく別のディレクトリ（`/tmp/candidate-crm-restore-drill`）を使う。
+- **バックアップ取得に使ったディレクトリ（`/tmp/candidate-crm-prod-release`、productionへlink済み）を、このrestore drillに再利用してはいけません。** 新しく別のディレクトリ（`$HOME/secure-restore-drills/candidate-crm`）を使う。macOSのColima/QEMUでは`/tmp`がVMへ共有されず、Supabaseのbind mountが壊れる場合があるため、ローカルdrillを`/tmp`に置かない。
 - drill用ディレクトリの接続先は、**production以外**（ローカルSupabase、または使い捨ての検証用Supabaseプロジェクト）だけに限定する。
 - DBの復元先とStorageの復元先は、**同一の検証環境**にする（片方だけ別環境にしない）。
 - drillのどのコマンドを実行する前にも、対象がproductionでないことを機械的に確認する（fail-closed）。**この確認はSupabase CLIのlink状態だけでなく、`psql`へ渡す接続文字列そのものに対しても行う。** CLIのlink先が検証用プロジェクトでも、接続文字列を誤って本番のものに差し替えてしまえば意味がないため。
@@ -335,10 +380,19 @@ if [ ! -f "$BACKUP_DIR/.backup-db-ok" ] || [ ! -f "$BACKUP_DIR/.backup-storage-o
   echo "FATAL: backups are not confirmed OK. Run sections 2 and 3 first." >&2
   exit 1
 fi
+if [ ! -s "$BACKUP_DIR/pre-migration-column-grants.json" ]; then
+  echo "FATAL: pre-migration column grant baseline is missing or empty." >&2
+  exit 1
+fi
 
-DRILL_DIR=/tmp/candidate-crm-restore-drill
+DRILL_DIR="$HOME/secure-restore-drills/candidate-crm"
+case "$DRILL_DIR" in
+  "$HOME"/secure-restore-drills/candidate-crm) ;;
+  *) echo "FATAL: unexpected drill directory. Aborting cleanup." >&2; exit 1 ;;
+esac
 rm -rf "$DRILL_DIR"
 mkdir -p "$DRILL_DIR"
+chmod 700 "$DRILL_DIR"
 cd "$DRILL_DIR"
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 init --workdir "$DRILL_DIR"
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 start --workdir "$DRILL_DIR"
@@ -347,6 +401,20 @@ SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 start --workdir "$DRILL_DI
 LOCAL_DB_URL=$(SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 status --workdir "$DRILL_DIR" -o json \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['DB_URL'])")
 
+# production接続文字列を誤って渡せないよう、loopback上のCLI既定URLだけを許可する。
+case "$LOCAL_DB_URL" in
+  postgresql://postgres:postgres@127.0.0.1:*/*) ;;
+  *) echo "FATAL: local DB URL is not the expected loopback URL." >&2; exit 1 ;;
+esac
+
+# CLI 2.111.0のローカル環境ではpostgresが非superuserのため、roles.sql内の
+# ALTER ROLE/ALTER SYSTEM相当を復元できない。ローカル専用のsupabase_adminへ切り替える。
+LOCAL_ADMIN_DB_URL=${LOCAL_DB_URL/postgres:postgres@/supabase_admin:postgres@}
+if [ "$(psql "$LOCAL_ADMIN_DB_URL" -X -A -t -c 'select current_user')" != "supabase_admin" ]; then
+  echo "FATAL: local restore connection is not supabase_admin." >&2
+  exit 1
+fi
+
 psql \
   --single-transaction \
   --variable ON_ERROR_STOP=1 \
@@ -354,7 +422,7 @@ psql \
   --file "$BACKUP_DIR/schema.sql" \
   --command 'SET session_replication_role = replica' \
   --file "$BACKUP_DIR/data.sql" \
-  --dbname "$LOCAL_DB_URL"
+  --dbname "$LOCAL_ADMIN_DB_URL"
 
 # Storageの復元（--local のみ使用、--linked は使わない）
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 storage cp -r \
@@ -364,6 +432,8 @@ SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 storage cp -r \
 # 4.4（検証）が使用する方式を記録する
 printf 'local' > "$DRILL_DIR/.drill-method"
 ```
+
+**Colima/QEMUでの既知の注意:** 通常の`supabase start`がStorageのhealth check待ちでタイムアウトした場合だけ、出力がhealth check timeoutであることを確認して`supabase start --ignore-health-check --workdir "$DRILL_DIR"`を再実行できます。これはエラーを無視して即復元する許可ではありません。再実行後に`supabase status`、上記`psql ... select current_user`、Storage CLIの応答を確認し、DBとStorageが利用可能になるまで復元処理へ進まないでください。`pgsodium_root.key: Is a directory`が出た場合は、drillが`/tmp`等のColima非共有パスに残っていないか確認し、環境を削除して本節の`$HOME`配下からやり直します。
 
 ### 4.3 方法B: 使い捨ての検証用Supabaseプロジェクト
 
@@ -437,9 +507,14 @@ assert_db_url_ref_equals() {
 : "${DRILL_PROJECT_REF:?Set DRILL_PROJECT_REF to the verification project's ref}"
 : "${DRILL_DB_URL:?Set DRILL_DB_URL to the verification project's connection string}"
 
-DRILL_DIR=/tmp/candidate-crm-restore-drill
+DRILL_DIR="$HOME/secure-restore-drills/candidate-crm"
+case "$DRILL_DIR" in
+  "$HOME"/secure-restore-drills/candidate-crm) ;;
+  *) echo "FATAL: unexpected drill directory. Aborting cleanup." >&2; exit 1 ;;
+esac
 rm -rf "$DRILL_DIR"
 mkdir -p "$DRILL_DIR"
+chmod 700 "$DRILL_DIR"
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 init --workdir "$DRILL_DIR"
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 link --project-ref "$DRILL_PROJECT_REF" --workdir "$DRILL_DIR"
 
@@ -499,8 +574,12 @@ if [ ! -f "$BACKUP_DIR/.backup-db-ok" ] || [ ! -f "$BACKUP_DIR/.backup-storage-o
   echo "FATAL: backups are not confirmed OK. Run sections 2 and 3 first." >&2
   exit 1
 fi
+if [ ! -s "$BACKUP_DIR/pre-migration-column-grants.json" ]; then
+  echo "FATAL: pre-migration column grant baseline is missing or empty." >&2
+  exit 1
+fi
 
-DRILL_DIR=/tmp/candidate-crm-restore-drill
+DRILL_DIR="$HOME/secure-restore-drills/candidate-crm"
 
 DRILL_METHOD=$(cat "$DRILL_DIR/.drill-method" 2>/dev/null || true)
 case "$DRILL_METHOD" in
@@ -544,14 +623,20 @@ case "$DRILL_METHOD" in
     ;;
 esac
 
-# スキーマ・列権限の検証（6.3節と同じ内容を復元先で確認する）
+# 列権限の検証。restore drillはmigration適用前バックアップの検証なので、
+# 6.3節の「適用後期待値」ではなく2節で保存した適用前基準値と比較する。
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 db query --workdir "$DRILL_DIR" "$DRILL_TARGET_FLAG" "
-select column_name
+select table_name, column_name
 from information_schema.role_column_grants
-where table_schema = 'public' and table_name = 'email_threads'
+where table_schema = 'public' and table_name in ('email_threads', 'files')
   and grantee = 'authenticated' and privilege_type = 'UPDATE'
-order by column_name;
-"
+order by table_name, column_name;
+" > "$DRILL_DIR/restored-column-grants.json"
+
+if ! diff "$BACKUP_DIR/pre-migration-column-grants.json" "$DRILL_DIR/restored-column-grants.json" > /dev/null; then
+  echo "FATAL: restored column grants do not match the pre-migration backup baseline." >&2
+  exit 1
+fi
 
 # Storage実体の整合性をチェックサムで確認する
 mkdir -p "$DRILL_DIR/restored-crm-files"
@@ -559,8 +644,19 @@ SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 storage cp -r \
   ss:///crm-files "$DRILL_DIR/restored-crm-files" \
   "$DRILL_TARGET_FLAG" --experimental --workdir "$DRILL_DIR"
 
-(cd "$DRILL_DIR/restored-crm-files" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256) \
-  > "$DRILL_DIR/restored-crm-files.sha256"
+python3 - "$DRILL_DIR/restored-crm-files" "$DRILL_DIR/restored-crm-files.sha256" <<'PY'
+import hashlib
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+output = Path(sys.argv[2])
+lines = []
+for path in sorted(item for item in root.rglob("*") if item.is_file()):
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    lines.append(f"{digest}  {path.relative_to(root).as_posix()}")
+output.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+PY
 
 if ! diff "$BACKUP_DIR/crm-files.sha256" "$DRILL_DIR/restored-crm-files.sha256" > /dev/null; then
   echo "FATAL: checksum mismatch between backup and restored files." >&2
@@ -576,7 +672,7 @@ if ! diff "$BACKUP_DIR/crm-files-metadata-baseline.json" "$DRILL_DIR/restored-cr
   exit 1
 fi
 
-echo "OK: schema/column grants, file checksums, and storage.objects metadata all match."
+echo "OK: pre-migration column grants, file checksums, and storage.objects metadata all match."
 touch "$BACKUP_DIR/.restore-drill-ok"
 echo "OK: restore drill fully verified. Migration application may proceed."
 ```
@@ -593,28 +689,28 @@ echo "OK: restore drill fully verified. Migration application may proceed."
 | DB・Storageとも同一検証環境へ復元した                                                                                                                                     |        |        |      |      |
 | 4.4で`BACKUP_DIR`のポインタ検証・`.backup-db-ok`/`.backup-storage-ok`確認が成功した                                                                                       |        |        |      |      |
 | （方法Bの場合）4.4で`.drill-project-ref`と実際のlink先が一致し、かつproduction refでないことを再確認した                                                                  |        |        |      |      |
-| `.drill-method`から方式を自動判定し、スキーマ・列権限を復元先で検証した                                                                                                   |        |        |      |      |
+| `.drill-method`から方式を自動判定し、復元先の列権限が適用前基準値と一致した                                                                                               |        |        |      |      |
 | Storageチェックサム・`storage.objects`メタデータの一致確認、`.restore-drill-ok`作成                                                                                       |        |        |      |      |
 | drill環境の後片付け（ローカル停止 or 使い捨てプロジェクト削除）                                                                                                           |        |        |      |      |
 
 ## 5. 適用対象migrationの確認
 
-現時点でproductionに未適用のmigrationは、staging・ローカルリポジトリの両方で動作確認済みの以下2件のみです（2026-08-09時点、`migration list --linked`で確認済み）。
+以下2件は2026-08-10にproductionへ適用済みです。**同じmigrationを再適用する手順ではありません。** この一覧はStage 1の実施記録として残します。
 
 ```
 20260808003737_restrict_email_thread_update_columns.sql
 20260808043603_restrict_files_update_columns.sql
 ```
 
-適用前に必ず対象を再確認する。
+今後のリリースでは、適用前に必ず未適用対象を動的に再確認する。
 
 ```sh
 cd /tmp/candidate-crm-prod-release
 SUPABASE_TELEMETRY_DISABLED=1 npx -y supabase@2.111.0 migration list --linked
 ```
 
-- `remote`列に上記2件が含まれていない（＝未適用）ことを確認する。
-- それ以外の21件（`20260806082242`〜`20260807000240`）は既にproductionへ適用済みのため、差分に含まれないことを確認する。
+- 2026-08-10のStage 1完了後は、`remote`列に上記2件が含まれていることを確認する。
+- 新しいリリースでは、ローカルだけに存在するmigrationを一覧化し、承認済み対象以外が1件でもあれば中止する。
 
 ## 6. migration適用（fail-fastゲート → dry-run → 適用）
 
@@ -723,7 +819,7 @@ grant update (archived_at) on table public.files to authenticated;
 
 ## 7. Edge Functionsの確認・deploy
 
-2026-08-09時点の読み取り調査で、production・staging・ローカルリポジトリ（`dc8bd81`）の4関数（`generate-candidate-summary`、`extract-job-posting`、`get-ai-usage`、`invite-user`）は、`index.ts`・`deno.json`の内容が3者間で完全一致していることを確認済みです（`functions download`で取得し`diff`で比較）。したがって**今回のリリースでEdge Functionsの再deployは必須ではありません**。
+2026-08-09時点の読み取り調査で、production・staging・Stage 1対象コミットの4関数（`generate-candidate-summary`、`extract-job-posting`、`get-ai-usage`、`invite-user`）は、`index.ts`・`deno.json`の内容が3者間で完全一致していることを確認済みです（`functions download`で取得し`diff`で比較）。したがって**Stage 1でEdge Functionsの再deployは不要でした**。
 
 念のため再確認・再deployする場合の手順は以下の通りです（本Runbook作成時点では実施していません）。
 
@@ -823,7 +919,7 @@ production側に既にadminロールの利用者が存在するかどうかは�
 
 ### 選択肢A: 内部スモークテスト用のローカルビルド（署名なし、限定配布不可）
 
-**開発用のメインリポジトリ（`.env.local`）は絶対に上書きしないでください。** 代わりに、リリース対象コミット（RC1 = `dc8bd81`）だけをチェックアウトした、独立した`git worktree`を作成してビルドします。これによりメイン開発リポジトリの作業状態（staging向け`.env.local`を含む）に一切影響しません。**依存関係は`npm ci`で`package-lock.json`通りに再現可能な状態でインストールします（`npm install`は使いません）。**
+**開発用のメインリポジトリ（`.env.local`）は絶対に上書きしないでください。** 代わりに、承認済みリリースコミットだけをチェックアウトした、独立した`git worktree`を作成してビルドします。これによりメイン開発リポジトリの作業状態（staging向け`.env.local`を含む）に一切影響しません。**依存関係は`npm ci`で`package-lock.json`通りに再現可能な状態でインストールします（`npm install`は使いません）。**
 
 ```bash
 #!/usr/bin/env bash
@@ -833,7 +929,9 @@ set -euo pipefail
 cd /path/to/candidate-crm
 git fetch origin
 WORKTREE_DIR=/tmp/candidate-crm-rc1-build
-git worktree add --detach "$WORKTREE_DIR" dc8bd81
+RELEASE_COMMIT="${RELEASE_COMMIT:?Set RELEASE_COMMIT to the approved immutable commit hash}"
+git cat-file -e "$RELEASE_COMMIT^{commit}"
+git worktree add --detach "$WORKTREE_DIR" "$RELEASE_COMMIT"
 
 cd "$WORKTREE_DIR"
 # このディレクトリは新規のworktreeなので、ここへ.env.localを作成してもメインリポジトリへは影響しない
