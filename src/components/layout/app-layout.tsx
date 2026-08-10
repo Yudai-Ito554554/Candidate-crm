@@ -79,7 +79,8 @@ export function AppLayout() {
 
   if (access.isPending) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-2 bg-slate-50 p-6">
+        <EnvironmentBadge environmentName={environmentName} />
         <p className="text-sm text-slate-600" role="status">
           アクセス権限を確認しています…
         </p>
@@ -94,9 +95,12 @@ export function AppLayout() {
           className="w-full max-w-md rounded-lg border border-amber-200 bg-white p-6 shadow-sm"
           role="alert"
         >
-          <h1 className="text-lg font-semibold text-slate-950">
-            利用承認をお待ちください
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-slate-950">
+              利用承認をお待ちください
+            </h1>
+            <EnvironmentBadge environmentName={environmentName} />
+          </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             このアカウントはまだCandidate
             CRMの利用を承認されていません。管理者へ承認を依頼してください。

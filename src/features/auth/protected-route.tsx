@@ -9,7 +9,10 @@ export function ProtectedRoute() {
   const auth = useAuth();
 
   if (!environment.success) return <ConfigurationErrorPage />;
-  if (auth.status === "loading") return <AuthLoadingScreen />;
+  if (auth.status === "loading")
+    return (
+      <AuthLoadingScreen environmentName={environment.data.VITE_APP_ENV} />
+    );
   if (!auth.session) return <Navigate replace to="/login" />;
 
   return <Outlet />;

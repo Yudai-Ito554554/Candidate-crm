@@ -36,10 +36,12 @@ export function LoginPage() {
   }, [auth.status, navigate]);
 
   if (!environment.success) return <ConfigurationErrorPage />;
-  if (auth.status === "loading") return <AuthLoadingScreen />;
-  if (auth.session) return <Navigate replace to="/" />;
 
   const environmentName = environment.data.VITE_APP_ENV;
+
+  if (auth.status === "loading")
+    return <AuthLoadingScreen environmentName={environmentName} />;
+  if (auth.session) return <Navigate replace to="/" />;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
