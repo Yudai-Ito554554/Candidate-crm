@@ -2628,12 +2628,24 @@ describe("Candidate CRM Phase 2.5 routes", () => {
       ],
       error: null,
     });
+    candidateMocks.listCandidates.mockClear();
+    candidateMocks.listCandidateViews.mockClear();
+    candidateMocks.listApplications.mockClear();
+    candidateMocks.listActivities.mockClear();
+    candidateMocks.listTasks.mockClear();
+    candidateMocks.listEmailThreads.mockClear();
     renderRoute("/");
 
     expect(
       await screen.findByRole("heading", { name: "利用承認をお待ちください" }),
     ).toBeVisible();
     expect(screen.queryByText("今日の対応")).not.toBeInTheDocument();
+    expect(candidateMocks.listCandidates).not.toHaveBeenCalled();
+    expect(candidateMocks.listCandidateViews).not.toHaveBeenCalled();
+    expect(candidateMocks.listApplications).not.toHaveBeenCalled();
+    expect(candidateMocks.listActivities).not.toHaveBeenCalled();
+    expect(candidateMocks.listTasks).not.toHaveBeenCalled();
+    expect(candidateMocks.listEmailThreads).not.toHaveBeenCalled();
   });
 
   it("ログアウト失敗時に日本語エラーを表示する", async () => {
@@ -2680,13 +2692,14 @@ describe("Candidate CRM Phase 2.5 routes", () => {
     ).toHaveAttribute("draggable", "false");
   });
 
-  it("閲覧者が編集ルートを直接開いてもフォームを表示しない", async () => {
+  it("閲覧者の候補者詳細には編集・追加・AI生成操作を表示しない", async () => {
+    const user = userEvent.setup();
     candidateMocks.listProfiles.mockResolvedValue({
       data: [
         {
           id: "user-001",
           display_name: "閲覧担当",
-          email: "agent@example.com",
+          email: "viewer@example.com",
           role: "viewer",
           created_at: "2026-08-01T00:00:00Z",
           updated_at: "2026-08-01T00:00:00Z",
@@ -2694,14 +2707,126 @@ describe("Candidate CRM Phase 2.5 routes", () => {
       ],
       error: null,
     });
-    renderRoute("/candidates/new");
+    renderRoute("/candidates/c-001");
 
     expect(
-      await screen.findByRole("heading", { name: "閲覧専用アカウントです" }),
+      await screen.findByRole("heading", { name: "佐藤 健太" }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "候補者を登録" }),
+      screen.queryByRole("link", { name: "候補者を編集" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "活動追加" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "求人提案" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "タスク追加" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "AI" }));
+    expect(
+      screen.queryByRole("button", { name: "AIサマリーを生成" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["/jobs/j-001", "求人を編集"],
+    ["/companies/company-001", "編集"],
+  ])("閲覧者の詳細画面 %s に編集操作を表示しない", async (path, editLabel) => {
+    candidateMocks.listProfiles.mockResolvedValue({
+      data: [
+        {
+          id: "user-001",
+          display_name: "閲覧担当",
+          email: "viewer@example.com",
+          role: "viewer",
+          created_at: "2026-08-01T00:00:00Z",
+          updated_at: "2026-08-01T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+    renderRoute(path);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: path.startsWith("/jobs")
+          ? "TAVI製品 営業担当"
+          : "メディカルデバイス株式会社",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: editLabel }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["/candidates/new", "候補者を登録"],
+    ["/candidates/c-001/edit", "候補者を更新"],
+    ["/jobs/new", "求人を登録"],
+    ["/jobs/j-001/edit", "求人を更新"],
+    ["/companies/new", "企業を登録"],
+    ["/companies/company-001/edit", "企業を更新"],
+  ])(
+    "閲覧者が編集ルート %s を直接開いてもフォームを表示しない",
+    async (path, submitLabel) => {
+      candidateMocks.listProfiles.mockResolvedValue({
+        data: [
+          {
+            id: "user-001",
+            display_name: "閲覧担当",
+            email: "viewer@example.com",
+            role: "viewer",
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-01T00:00:00Z",
+          },
+        ],
+        error: null,
+      });
+      renderRoute(path);
+
+      expect(
+        await screen.findByRole("heading", { name: "閲覧専用アカウントです" }),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: submitLabel }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("閲覧者には招待・ロール変更・監査ログ・AI利用管理を表示しない", async () => {
+    candidateMocks.listProfiles.mockResolvedValue({
+      data: [
+        {
+          id: "user-001",
+          display_name: "閲覧担当",
+          email: "viewer@example.com",
+          role: "viewer",
+          created_at: "2026-08-01T00:00:00Z",
+          updated_at: "2026-08-01T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+    candidateMocks.listAuditLogs.mockClear();
+    renderRoute("/settings");
+
+    expect(
+      await screen.findByRole("heading", { name: "設定", level: 2 }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "招待メールを送信" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "閲覧担当のロール" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: "監査ログ一覧" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("AI利用状況")).not.toBeInTheDocument();
+    expect(candidateMocks.listAuditLogs).not.toHaveBeenCalled();
   });
 
   it.each([
