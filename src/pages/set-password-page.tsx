@@ -5,8 +5,10 @@ import { useForm } from "react-hook-form";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
+import { EnvironmentBadge } from "@/components/common/environment-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { environment } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
 const passwordSchema = z
@@ -34,6 +36,9 @@ export function SetPasswordPage() {
     handleSubmit,
     register,
   } = useForm<PasswordFormValues>({ resolver: zodResolver(passwordSchema) });
+  const environmentName = environment.success
+    ? environment.data.VITE_APP_ENV
+    : "production";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -43,9 +48,12 @@ export function SetPasswordPage() {
             <KeyRound aria-hidden="true" className="size-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-slate-950">
-              パスワードを設定
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-slate-950">
+                パスワードを設定
+              </h1>
+              <EnvironmentBadge environmentName={environmentName} />
+            </div>
             <p className="text-xs text-slate-500">
               {isRecovery
                 ? "Candidate CRMのパスワード再設定"

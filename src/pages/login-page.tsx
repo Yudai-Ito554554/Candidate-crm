@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { EnvironmentBadge } from "@/components/common/environment-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthLoadingScreen } from "@/features/auth/auth-loading-screen";
@@ -38,6 +39,8 @@ export function LoginPage() {
   if (auth.status === "loading") return <AuthLoadingScreen />;
   if (auth.session) return <Navigate replace to="/" />;
 
+  const environmentName = environment.data.VITE_APP_ENV;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
       <section className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -46,9 +49,12 @@ export function LoginPage() {
             <LockKeyhole aria-hidden="true" className="size-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-slate-950">
-              Candidate CRM
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-slate-950">
+                Candidate CRM
+              </h1>
+              <EnvironmentBadge environmentName={environmentName} />
+            </div>
             <p className="text-xs text-slate-500">業務アカウントでログイン</p>
           </div>
         </div>

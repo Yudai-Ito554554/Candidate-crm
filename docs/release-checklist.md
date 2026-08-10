@@ -17,6 +17,7 @@ QA成果物のビルドには、対象Supabaseプロジェクトの次の公開�
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_APP_ENV`（社内QAは`staging`、本番は`production`）
 
 `SUPABASE_SERVICE_ROLE_KEY`、`OPENAI_API_KEY`、OAuth client secret、メールrefresh tokenは登録しません。これらはデスクトップ成果物へ絶対に埋め込みません。
 

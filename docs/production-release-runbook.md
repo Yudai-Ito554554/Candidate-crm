@@ -936,6 +936,7 @@ git worktree add --detach "$WORKTREE_DIR" "$RELEASE_COMMIT"
 cd "$WORKTREE_DIR"
 # このディレクトリは新規のworktreeなので、ここへ.env.localを作成してもメインリポジトリへは影響しない
 cat > .env.local << 'EOF'
+VITE_APP_ENV=production
 VITE_SUPABASE_URL=https://dsaqarejqslzgcatkxeh.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<productionのpublishable key>
 EOF

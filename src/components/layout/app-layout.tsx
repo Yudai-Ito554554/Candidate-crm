@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { EnvironmentBadge } from "@/components/common/environment-badge";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ConnectivityBanner } from "@/components/layout/connectivity-banner";
 import { GlobalCreateMenu } from "@/components/layout/global-create-menu";
 import { EditorOnly } from "@/features/access/editor-only";
 import { useAccess } from "@/features/access/use-access";
 import { useAuth } from "@/features/auth/use-auth";
+import { environment } from "@/lib/env";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -58,6 +60,9 @@ export function AppLayout() {
     [location.pathname],
   );
   const userLabel = auth.user?.email ?? "ログインユーザー";
+  const environmentName = environment.success
+    ? environment.data.VITE_APP_ENV
+    : "production";
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -122,13 +127,25 @@ export function AppLayout() {
         )}
       >
         <div className="flex h-16 items-center gap-3 border-b border-slate-800 px-4">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold">
+          <div className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold">
             C
+            {collapsed && environmentName === "staging" ? (
+              <span
+                aria-label="ステージング環境"
+                className="absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-slate-950 bg-amber-400"
+                title="STAGING"
+              />
+            ) : null}
           </div>
           {!collapsed ? (
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">Candidate CRM</p>
-              <p className="text-[11px] text-slate-400">Recruiting workspace</p>
+              <div className="mt-0.5 flex items-center gap-2">
+                <p className="text-[11px] text-slate-400">
+                  Recruiting workspace
+                </p>
+                <EnvironmentBadge environmentName={environmentName} />
+              </div>
             </div>
           ) : null}
         </div>
@@ -182,10 +199,11 @@ export function AppLayout() {
         )}
       >
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white px-5">
-          <div className="min-w-36">
+          <div className="flex min-w-36 items-center gap-2">
             <h1 className="text-lg font-semibold text-slate-900">
               {pageTitle}
             </h1>
+            <EnvironmentBadge environmentName={environmentName} />
           </div>
           <div className="relative max-w-xl flex-1">
             <GlobalSearch />

@@ -24,5 +24,19 @@ describe("validateEnvironment", () => {
     });
 
     expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.VITE_APP_ENV).toBe("production");
+  });
+
+  it("ステージング環境を明示できる", () => {
+    const result = validateEnvironment({
+      VITE_APP_ENV: "staging",
+      VITE_SUPABASE_URL: "https://example.supabase.co",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.VITE_APP_ENV).toBe("staging");
   });
 });

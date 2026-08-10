@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const environmentSchema = z.object({
+  VITE_APP_ENV: z.enum(["production", "staging"]).default("production"),
   VITE_SUPABASE_URL: z
     .string()
     .trim()
@@ -31,6 +32,7 @@ export function validateEnvironment(
 }
 
 export const environment = validateEnvironment({
+  VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
   VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
 });
