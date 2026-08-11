@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   candidateFormSchema,
+  emptyCandidateFormValues,
   type CandidateFormValues,
 } from "@/features/candidates/candidate-form-model";
 import type {
@@ -52,36 +53,46 @@ function localDateTimeInput(value: string | null | undefined): string {
   return localDate.toISOString().slice(0, 16);
 }
 
-function defaultValues(candidate?: CandidateRow): CandidateFormValues {
+function defaultValues(
+  candidate?: CandidateRow,
+  initialValues?: CandidateFormValues,
+): CandidateFormValues {
+  if (!candidate && initialValues) return initialValues;
+  const empty = emptyCandidateFormValues();
   return {
-    full_name: candidate?.full_name ?? "",
-    full_name_kana: candidate?.full_name_kana ?? "",
-    email: candidate?.email ?? "",
-    phone: candidate?.phone ?? "",
-    birth_date: candidate?.birth_date ?? "",
-    prefecture: candidate?.prefecture ?? "",
-    current_company: candidate?.current_company ?? "",
-    current_department: candidate?.current_department ?? "",
-    current_job_title: candidate?.current_job_title ?? "",
-    current_occupation: candidate?.current_occupation ?? "",
-    candidate_status: candidate?.candidate_status ?? "new",
-    desired_occupations: candidate?.desired_occupations.join("、") ?? "",
-    desired_locations: candidate?.desired_locations.join("、") ?? "",
+    full_name: candidate?.full_name ?? empty.full_name,
+    full_name_kana: candidate?.full_name_kana ?? empty.full_name_kana,
+    email: candidate?.email ?? empty.email,
+    phone: candidate?.phone ?? empty.phone,
+    birth_date: candidate?.birth_date ?? empty.birth_date,
+    prefecture: candidate?.prefecture ?? empty.prefecture,
+    current_company: candidate?.current_company ?? empty.current_company,
+    current_department:
+      candidate?.current_department ?? empty.current_department,
+    current_job_title: candidate?.current_job_title ?? empty.current_job_title,
+    current_occupation:
+      candidate?.current_occupation ?? empty.current_occupation,
+    candidate_status: candidate?.candidate_status ?? empty.candidate_status,
+    desired_occupations:
+      candidate?.desired_occupations.join("、") ?? empty.desired_occupations,
+    desired_locations:
+      candidate?.desired_locations.join("、") ?? empty.desired_locations,
     current_salary_min: valueOrEmpty(candidate?.current_salary_min ?? null),
     current_salary_max: valueOrEmpty(candidate?.current_salary_max ?? null),
     desired_salary_min: valueOrEmpty(candidate?.desired_salary_min ?? null),
     desired_salary_max: valueOrEmpty(candidate?.desired_salary_max ?? null),
-    available_from: candidate?.available_from ?? "",
-    reason_for_change: candidate?.reason_for_change ?? "",
-    priority_conditions: candidate?.priority_conditions ?? "",
-    strengths: candidate?.strengths ?? "",
-    concerns: candidate?.concerns ?? "",
-    interview_summary: candidate?.interview_summary ?? "",
-    next_action: candidate?.next_action ?? "",
+    available_from: candidate?.available_from ?? empty.available_from,
+    reason_for_change: candidate?.reason_for_change ?? empty.reason_for_change,
+    priority_conditions:
+      candidate?.priority_conditions ?? empty.priority_conditions,
+    strengths: candidate?.strengths ?? empty.strengths,
+    concerns: candidate?.concerns ?? empty.concerns,
+    interview_summary: candidate?.interview_summary ?? empty.interview_summary,
+    next_action: candidate?.next_action ?? empty.next_action,
     next_action_due_at: localDateTimeInput(candidate?.next_action_due_at),
-    waiting_on: candidate?.waiting_on ?? "none",
-    source: candidate?.source ?? "",
-    private_notes: candidate?.private_notes ?? "",
+    waiting_on: candidate?.waiting_on ?? empty.waiting_on,
+    source: candidate?.source ?? empty.source,
+    private_notes: candidate?.private_notes ?? empty.private_notes,
   };
 }
 
@@ -105,6 +116,7 @@ function Field({
 
 export function CandidateForm({
   candidate,
+  initialValues,
   errorMessage,
   isSubmitting,
   onCancel,
@@ -112,6 +124,7 @@ export function CandidateForm({
   onSubmit,
 }: {
   candidate?: CandidateRow;
+  initialValues?: CandidateFormValues;
   errorMessage?: string;
   isSubmitting: boolean;
   onCancel: () => void;
@@ -124,7 +137,7 @@ export function CandidateForm({
     register,
   } = useForm<CandidateFormValues>({
     resolver: zodResolver(candidateFormSchema),
-    defaultValues: defaultValues(candidate),
+    defaultValues: defaultValues(candidate, initialValues),
   });
 
   return (

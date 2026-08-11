@@ -90,6 +90,39 @@ export type CandidateDuplicateMatch = {
   matchedFields: Array<"氏名" | "メールアドレス" | "電話番号">;
 };
 
+export function emptyCandidateFormValues(): CandidateFormValues {
+  return {
+    full_name: "",
+    full_name_kana: "",
+    email: "",
+    phone: "",
+    birth_date: "",
+    prefecture: "",
+    current_company: "",
+    current_department: "",
+    current_job_title: "",
+    current_occupation: "",
+    candidate_status: "new",
+    desired_occupations: "",
+    desired_locations: "",
+    current_salary_min: "",
+    current_salary_max: "",
+    desired_salary_min: "",
+    desired_salary_max: "",
+    available_from: "",
+    reason_for_change: "",
+    priority_conditions: "",
+    strengths: "",
+    concerns: "",
+    interview_summary: "",
+    next_action: "",
+    next_action_due_at: "",
+    waiting_on: "none",
+    source: "",
+    private_notes: "",
+  };
+}
+
 function normalizeName(value: string | null): string {
   return (value ?? "").normalize("NFKC").replace(/\s+/g, "").toLowerCase();
 }

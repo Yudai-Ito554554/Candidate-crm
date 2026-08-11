@@ -1,5 +1,6 @@
 import {
   Archive,
+  FileUp,
   KanbanSquare,
   List,
   LoaderCircle,
@@ -92,12 +93,20 @@ export function CandidatesPage() {
       <PageIntro
         action={
           <EditorOnly>
-            <Button asChild className="gap-2" size="sm">
-              <Link to="/candidates/new">
-                <Plus className="size-4" />
-                新規候補者登録
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild className="gap-2" size="sm" variant="outline">
+                <Link to="/candidates/import">
+                  <FileUp className="size-4" />
+                  データ取り込み
+                </Link>
+              </Button>
+              <Button asChild className="gap-2" size="sm">
+                <Link to="/candidates/new">
+                  <Plus className="size-4" />
+                  新規候補者登録
+                </Link>
+              </Button>
+            </div>
           </EditorOnly>
         }
         description="候補者を中心に、一覧と進捗パイプラインを切り替えます。"

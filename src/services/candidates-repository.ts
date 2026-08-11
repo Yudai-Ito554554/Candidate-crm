@@ -97,6 +97,14 @@ export function createCandidate(
   );
 }
 
+export function createCandidates(
+  values: CandidateInsert[],
+): Promise<RepositoryResult<CandidateRow[]>> {
+  return executeSelect<CandidateRow>((client) =>
+    client.from("candidates").insert(values).select("*"),
+  );
+}
+
 export function updateCandidate(
   candidateId: string,
   values: CandidateUpdate,

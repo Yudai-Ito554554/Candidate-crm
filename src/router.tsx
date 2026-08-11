@@ -138,6 +138,13 @@ export const appRoutes: RouteObject[] = [
                 }),
               },
               {
+                path: "candidates/import",
+                lazy: async () => ({
+                  Component: (await import("@/pages/candidate-import-page"))
+                    .CandidateImportPage,
+                }),
+              },
+              {
                 path: "candidates/:candidateId/edit",
                 lazy: async () => ({
                   Component: (await import("@/pages/candidate-form-page"))

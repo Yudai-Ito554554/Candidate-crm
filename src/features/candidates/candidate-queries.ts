@@ -5,6 +5,7 @@ import {
   archiveCandidate,
   completeCandidateNextAction,
   createCandidate,
+  createCandidates,
   createCandidateExperience,
   getCandidate,
   listArchivedCandidates,
@@ -152,6 +153,24 @@ export function useCreateCandidateMutation() {
         candidateQueryKeys.detail(candidate.id),
         candidate,
       );
+      void queryClient.invalidateQueries({
+        queryKey: candidateQueryKeys.all,
+        exact: true,
+      });
+    },
+  });
+}
+
+export function useCreateCandidatesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<CandidateRow[], Error, CandidateInsert[]>({
+    mutationFn: (values) => unwrap<CandidateRow[]>(createCandidates(values)),
+    onSuccess: (candidates) => {
+      for (const candidate of candidates)
+        queryClient.setQueryData(
+          candidateQueryKeys.detail(candidate.id),
+          candidate,
+        );
       void queryClient.invalidateQueries({
         queryKey: candidateQueryKeys.all,
         exact: true,

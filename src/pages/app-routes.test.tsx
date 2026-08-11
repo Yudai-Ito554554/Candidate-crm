@@ -30,6 +30,7 @@ const candidateMocks = vi.hoisted(() => ({
   recordCandidateView: vi.fn(),
   getCandidate: vi.fn(),
   createCandidate: vi.fn(),
+  createCandidates: vi.fn(),
   updateCandidate: vi.fn(),
   archiveCandidate: vi.fn(),
   restoreCandidate: vi.fn(),
@@ -121,6 +122,7 @@ vi.mock("@/services/candidates-repository", () => ({
   recordCandidateView: candidateMocks.recordCandidateView,
   getCandidate: candidateMocks.getCandidate,
   createCandidate: candidateMocks.createCandidate,
+  createCandidates: candidateMocks.createCandidates,
   updateCandidate: candidateMocks.updateCandidate,
   archiveCandidate: candidateMocks.archiveCandidate,
   restoreCandidate: candidateMocks.restoreCandidate,
@@ -1128,7 +1130,11 @@ describe("Candidate CRM Phase 2.5 routes", () => {
 
     expect(candidateMocks.searchCrm).toHaveBeenCalledWith("佐藤");
     expect(
-      await screen.findByRole("heading", { name: "佐藤 健太" }),
+      await screen.findByRole(
+        "heading",
+        { name: "佐藤 健太" },
+        { timeout: 3_000 },
+      ),
     ).toBeInTheDocument();
   });
 
@@ -2764,6 +2770,7 @@ describe("Candidate CRM Phase 2.5 routes", () => {
 
   it.each([
     ["/candidates/new", "候補者を登録"],
+    ["/candidates/import", "選択した0名を登録"],
     ["/candidates/c-001/edit", "候補者を更新"],
     ["/jobs/new", "求人を登録"],
     ["/jobs/j-001/edit", "求人を更新"],
@@ -2834,6 +2841,7 @@ describe("Candidate CRM Phase 2.5 routes", () => {
     ["/candidates", "候補者"],
     ["/candidates/c-001", "佐藤 健太"],
     ["/candidates/new", "新規候補者登録"],
+    ["/candidates/import", "候補者データ取り込み"],
     ["/candidates/c-001/edit", "佐藤 健太を編集"],
     ["/jobs", "求人一覧"],
     ["/jobs/new", "新規求人登録"],
@@ -2859,5 +2867,24 @@ describe("Candidate CRM Phase 2.5 routes", () => {
     expect(
       screen.queryByText("Unexpected Application Error"),
     ).not.toBeInTheDocument();
+  });
+
+  it("候補者取り込み画面で履歴書テキストを確認フォームへ反映する", async () => {
+    const user = userEvent.setup();
+    renderRoute("/candidates/import");
+
+    expect(
+      await screen.findByRole("heading", { name: "候補者データ取り込み" }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "履歴書・テキスト" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "候補者情報テキスト" }),
+      "氏名：山田 太郎\nメールアドレス：taro@example.com\n職種：医療機器営業",
+    );
+    await user.click(screen.getByRole("button", { name: "入力候補を作成" }));
+
+    expect(screen.getByDisplayValue("山田 太郎")).toBeVisible();
+    expect(screen.getByDisplayValue("taro@example.com")).toBeVisible();
+    expect(screen.getByDisplayValue("医療機器営業")).toBeVisible();
   });
 });

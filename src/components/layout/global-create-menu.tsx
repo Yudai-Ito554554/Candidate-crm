@@ -1,4 +1,10 @@
-import { BriefcaseBusiness, Building2, Plus, UsersRound } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Building2,
+  FileUp,
+  Plus,
+  UsersRound,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,6 +16,12 @@ const createItems = [
     description: "候補者の基本情報と希望条件",
     path: "/candidates/new",
     icon: UsersRound,
+  },
+  {
+    label: "候補者データを取り込む",
+    description: "CSV一括登録・履歴書テキスト",
+    path: "/candidates/import",
+    icon: FileUp,
   },
   {
     label: "企業を登録",
