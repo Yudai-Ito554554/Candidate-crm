@@ -116,19 +116,23 @@ select extensions.throws_ok(
   'a suspended account cannot insert candidates'
 );
 
+update public.candidates
+set full_name = 'Suspended update must not apply'
+where id = '20000000-0000-0000-0000-000000000001';
+
+reset role;
+
 select extensions.is(
   (
-    with updated_candidate as (
-      update public.candidates
-      set full_name = 'Suspended update must not apply'
-      where id = '20000000-0000-0000-0000-000000000001'
-      returning id
-    )
-    select count(*) from updated_candidate
+    select full_name
+    from public.candidates
+    where id = '20000000-0000-0000-0000-000000000001'
   ),
-  0::bigint,
+  'Batch 1 access fixture'::text,
   'a suspended account cannot update candidates'
 );
+
+set local role authenticated;
 
 select set_config(
   'request.jwt.claim.sub',
