@@ -1,9 +1,9 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
 最終更新: 2026-08-11（Asia/Tokyo）
-最終確認HEAD: `1fe0679`（`docs: add CRM implementation handoff`）／`origin/main`と同期済み
+レビュー基準HEAD: `76f789c`（`fable5-review-fixes`）／`origin/main`は`1fe0679`のまま変更なし
 
-このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。**コード変更はこの文書の作成時点では行っていません。**
+このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Batch 1変更はレビュー用ブランチ`fable5-review-fixes`へpush済みで、`main`には未反映です。
 
 ---
 
@@ -13,7 +13,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 
 - フロントエンド: React 19 + TypeScript + Vite + TanStack Query + React Hook Form + Zod + Tailwind CSS
 - デスクトップシェル: Tauri 2（Rust）
-- バックエンド: Supabase（RLSをロール境界として使用。`admin`/`agent`が書き込み可、`viewer`は閲覧のみ、`pending`は承認待ちで業務データ非表示）
+- バックエンド: Supabase（RLSをロール境界として使用。`admin`/`agent`が書き込み可、`viewer`は閲覧のみ、`pending`は初回承認待ち、`suspended`は明示的な利用停止。後二者は業務データ非表示）
 - 主要ドメイン: 候補者（candidates）、企業（companies）、求人（jobs）、選考（applications）、パイプライン、活動（activities）、タスク、ファイル、Inbox、ホーム集約、レポート、AI求人票取り込み、AI候補者サマリー、監査ログ
 
 現在は「社内試験運用」フェーズで、プロジェクトオーナー本人によるproduction利用（Stage 2 Go判定済み）が進行中。外部顧客への一般提供（Stage 3）はまだ判定前。
@@ -49,7 +49,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 
 ## 3. 現在作業中の内容
 
-**明確に「作業中」と言える実装タスクは現時点でなし。** 現在のHEADは`1fe0679`で、`origin/main`と同期済み。
+**Fable 5レビュー対応Batch 1がレビュー用ブランチで進行中。** `suspended`ロール、停止画面、Authメール同期triggerと既存不整合backfill、関連テスト・レビュー文書を実装し、GitHub ActionsのmacOS、Windows、Supabase migration/policy検証は成功済み。`main`へのマージ、staging実アカウントUAT、production適用は未実施。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
@@ -96,7 +96,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 ## 6. 重要な設計判断とその理由
 
 - **`archived_at`による論理削除のみ、物理DELETEなし**: 候補者データの誤削除防止と監査要件のため。`AGENTS.md`で全エンティティに一貫適用。
-- **RLSをロール境界として使用し、クライアント側の表示制御は補助**: `admin`/`agent`が書き込み、`viewer`は閲覧のみ、`pending`はデータ非表示。UI側の非表示はUXのためであり、実際の権限境界はPostgres RLSで強制（`AGENTS.md`: "never treat client-side hiding as a substitute for RLS"）。
+- **RLSをロール境界として使用し、クライアント側の表示制御は補助**: `admin`/`agent`が書き込み、`viewer`は閲覧のみ、`pending`は初回承認待ち、`suspended`は利用停止で、後二者はデータ非表示。UI側の非表示はUXのためであり、実際の権限境界はPostgres RLSで強制（`AGENTS.md`: "never treat client-side hiding as a substitute for RLS"）。
 - **列単位GRANTは加算的**: 広いテーブルレベルGRANTがあると列スコープGRANTだけでは制限できない。列制限を行う際は必ず`REVOKE`を先に行う（2migrationで実際に踏んだ教訓）。
 - **`window.confirm()`はTauri WebViewで信頼できない**: ネイティブダイアログではなくアプリ内モーダルで確認UIを実装する方針に統一。
 - **staging/productionの区別を2階層で実装**: (1) UI上のSTAGINGバッジ（`VITE_APP_ENV`）、(2) OSレベルでの別アプリ化（`tauri.staging.conf.json`によるproductName/identifier分離）。理由は、社内テスターが誤って本番アプリを使う/本番アプリを上書きするリスクを両面から防ぐため。
@@ -161,7 +161,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 
 - **テストのflaky挙動を確認**: `src/pages/app-routes.test.tsx`の全体検索テスト（"佐藤"検索→`findByRole("heading", { name: "佐藤 健太" })`）が、フルテストスイート実行時に稀にタイムアウトで失敗することを本ドキュメント作成時に確認した（1回失敗/3回中）。単独実行では常に成功（92/92）。原因未調査だが、フルスイート実行時の並列ワーカー負荷によるタイミング依存の疑いが強い。**業務ロジックのバグではなくテストの安定性の問題である可能性が高いが、次に触る人は原因を確認すること。**
 - **S3-3（viewerの編集URL直接アクセス拒否）の実機検証方法が未確定**: Tauriアプリにはブラウザのアドレスバーに相当するUIがなく、「URLを直接入力する」という検証手順をどう再現するか、Runbook/UATチェックリスト上でも解決していない。自動回帰テストでは6ルート（候補者・求人・企業の新規/編集）を確認済みだが、実機での確認が求められている。
-- **最新HEADの通常CIは文書整形で失敗**: Run `31488166882`ではSupabase migration/policy jobは成功したが、macOS・Windows quality checksが本`HANDOFF.md`のPrettier未整形で停止した。アプリコードやDBテストの失敗ではなく、文書整形を直してCIをgreenへ戻す必要がある。
+- **Batch 1レビュー枝の通常CIは成功済み**: Run `31509690820`でmacOS、Windows、Supabase migration/policy checksの全3ジョブが成功。全migrationのクリーンDB再適用とpgTAPも成功した。
 - **Windows側の未検証事項が多い**: staging独立アプリのproductName/identifier反映、PDFドラッグ&ドロップ、インストーラー全体の動作、いずれもWindows実機がないためCI上の自動テストのみで裏付けられており、実機確認が残っている。
 - **既知の未実装領域**（バグではなく仕様上のスコープ外、README「現在の範囲外」節に明記）: Gmail/Outlook同期のOAuth・同期処理本体、メール送信/返信、ウイルススキャン、ファイル版管理、Googleログイン、カレンダー・Slack連携、検索履歴・高度な検索条件、複数組織対応、監査ログの長期保管・エクスポート、外部エラー監視サービス連携。
 
@@ -170,10 +170,10 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 ## 9. テスト状況
 
 - テストランナー: Vitest（`npm test` = `vitest run`）
-- 直近の実行結果: **65 test files / 339 tests、全件成功**（上記のflaky事例を除く。フルスイートを2回連続実行してどちらも339/339成功を確認済み）
+- 直近の実行結果: **65 test files / 342 tests、全件成功**。全体検索テストには過去のflaky報告が残るため、`docs/fable5-review-action-plan-2026-08-11.md`のM4として独立対応する。
 - テスト方針: `vi.hoisted()`で共有モック状態を持つ、`vi.mock("@/lib/env", ...)`パターン、ワークフローYAMLやJSON設定ファイルは`node:fs/promises`で実ファイルを読み文字列アサーションする方式（`src/test/*.test.ts`）
 - DB側のテスト: `supabase/tests`にpgTAPテストがあり、外部キー・RLS・クライアント権限・サーバー専用テーブルを検証。CIのDBジョブはUbuntu上のローカルSupabaseに全migrationを適用して実行（リモート接続なし、秘密情報不使用）。`npm run supabase:test`で実行可能（ローカルSupabase起動が前提）。
-- CI: commit `d5a8fc1`の通常CI Run `31482312635`は全3ジョブ成功。最新HEAD `1fe0679`のRun `31488166882`はSupabase migration/policy jobが成功し、macOS・Windows quality checksは本`HANDOFF.md`のPrettier未整形だけで停止した。アプリコードの型チェック・テスト・ビルド不良ではない。
+- CI: `fable5-review-fixes`のRun `31509690820`はmacOS、Windows、Supabase migration/policy checksの全3ジョブ成功。`main`は`1fe0679`のままで、Batch 1は未マージ。
 
 ---
 
@@ -250,6 +250,8 @@ npm run supabase:stop
    - `docs/production-go-no-go-checklist.md` — 本番移行の正式な進捗表（Stage 1/2はGo、Stage 3は未判定）
    - このファイル（`HANDOFF.md`）
    - `docs/development-handoff-2026-08-11.md` — より詳細な時系列ログ（本ファイルの元ネタ、粒度が細かい）
+   - `docs/fable5-review-action-plan-2026-08-11.md` — Fable 5指摘の採否、実装順、production適用条件
+   - `docs/fable5-review-brief-2026-08-11.md` — Fable 5へ渡した設計・セキュリティ論点と根拠
    - `README.md` — 機能の実装詳細（Phase単位）
    - `docs/uat-checklist.md` — 業務受け入れテスト観点
    - `docs/production-release-runbook.md` — 本番への実操作手順（実際にproductionを触る場合のみ）

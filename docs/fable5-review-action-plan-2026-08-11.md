@@ -35,6 +35,7 @@
 | M1  | RLS関数のinitPlan最適化不足        | 採用。公式推奨どおり`(select public.current_profile_role())`へ変更する独立migrationを作る。  |
 | M2  | 氏名redactionの表記ゆれ            | 採用。表記ゆれと海外連絡先を含む評価・単体テストを追加する。                                 |
 | M3  | Edge FunctionのCORSが`*`           | 要追加調査。Tauri/WebViewと認証ディープリンクのorigin実測後に許可リストを決める。            |
+| M4  | flakyテストとHydrateFallback警告   | 採用。優先度Lowの独立タスクとして、Batch 3完了後に原因を固定して解消する。                   |
 
 ### 保留
 
@@ -86,6 +87,7 @@
 - invite、AI候補者サマリー、AI求人取り込みのactor帰属を確認する。
 - Authメール同期のtriggerと既存不整合行backfillも、actorがnullになるsystem operationとして分類する。
 - JWTで確認したrequester IDを、改ざんできないサーバー側引数としてRPCへ渡す。
+- actor引数を受け取るRPCは`service_role`へのGRANTに限定し、`authenticated`へGRANTしない。authenticatedから呼べるRPCへactor引数を追加すると、クライアントが他者IDを詐称できるため。
 - `auth.uid()`がnullのsystem operationと、人間操作を区別できる監査仕様にする。
 
 状態: 未着手。設計レビュー後に実装する。
@@ -104,9 +106,19 @@
 
 - 外部提供前にSupabase Pro、MFA、leaked password protection、カスタムSMTPを判定する。
 - Apple Developer ID署名・NotarizationとWindowsクラウド署名を実装する。
+- AI入力本文は保存せず、redaction後入力のSHA-256ハッシュ、redactionバージョン、入力スキーマバージョンを記録する。
 - 利用規約、プライバシーポリシー、委託先一覧、インシデント対応Runbookを準備する。
 
 状態: 未着手。
+
+### Batch 3後の独立小タスク: テスト安定化と警告除去
+
+- 全体検索テストはfake timersでdebounceを進め、必要な`findBy`だけタイムアウトを5〜7秒へ延長する。
+- 遷移先routeを事前importし、lazy route解決を待つ競合を除く。
+- login系を含む他のlazy route群へ`hydrateFallbackElement`を追加し、警告を消す。
+- 業務ロジックの待機時間は変更せず、テストとrouter初期描画だけを安定化する。
+
+状態: 未着手。Batch 3完了後に独立して行う。
 
 ## 4. 今回の検証結果
 
