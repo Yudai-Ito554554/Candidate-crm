@@ -18,11 +18,11 @@ jobs:
           - platform: macOS
             os: macos-latest
             apple_signing_identity: "-"
-            artifact_name: candidate-crm-macos-unsigned
+            artifact_name: candidate-crm-staging-macos-unsigned
           - platform: Windows
             os: windows-latest
             apple_signing_identity: ""
-            artifact_name: candidate-crm-windows-unsigned
+            artifact_name: candidate-crm-staging-windows-unsigned
 
     env:
       VITE_APP_ENV: staging
@@ -68,7 +68,7 @@ jobs:
       - name: Build desktop installers
         env:
           APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
-        run: npm run tauri build
+        run: npm run tauri build -- --config src-tauri/tauri.staging.conf.json
 
       - name: Verify ad-hoc signed macOS bundles
         if: matrix.platform == 'macOS'
@@ -110,12 +110,13 @@ jobs:
           if [[ "${{ matrix.platform }}" == "macOS" ]]; then
             find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -exec cp {} "$package_path/" \;
             cat > "$package_path/INSTALL.txt" <<'EOF'
-          Candidate CRM macOS 社内QA版
+          Candidate CRM STAGING macOS 社内QA版
 
-          1. DMGを開き、Candidate CRMをApplicationsへドラッグします。
-          2. DMGを閉じ、Finderの「アプリケーション」からCandidate CRMを開きます。
-          3. この成果物はApple公証前の社内QA専用品です。macOSが起動を拒否する場合は、
-             システム設定 > プライバシーとセキュリティ から許可してください。
+          1. DMGを開き、「Candidate CRM STAGING」をApplicationsへドラッグします。
+             本番版（Candidate CRM）とは別アプリとして共存し、上書きしません。
+          2. DMGを閉じ、Finderの「アプリケーション」から「Candidate CRM STAGING」を開きます。
+          3. この成果物はstaging環境専用・Apple公証前の社内QA専用品です。macOSが起動を
+             拒否する場合は、システム設定 > プライバシーとセキュリティ から許可してください。
 
           「壊れている」「マルウェアが含まれていないことを検証できない」と表示される環境では、
           Developer ID署名・Apple公証済みの正式配布版が必要です。一般利用者へ配布しないでください。
@@ -124,10 +125,11 @@ jobs:
             find src-tauri/target/release/bundle/msi -maxdepth 1 -name '*.msi' -exec cp {} "$package_path/" \;
             find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*-setup.exe' -exec cp {} "$package_path/" \;
             cat > "$package_path/INSTALL.txt" <<'EOF'
-          Candidate CRM Windows 社内QA版
+          Candidate CRM STAGING Windows 社内QA版
 
-          MSIまたはsetup.exeを実行してインストールします。
-          この成果物はコード署名前の社内QA専用品です。一般利用者へ配布しないでください。
+          MSIまたはsetup.exeを実行してインストールします。「Candidate CRM STAGING」として、
+          本番版（Candidate CRM）とは別アプリでインストールされ、上書きしません。
+          この成果物はstaging環境専用・コード署名前の社内QA専用品です。一般利用者へ配布しないでください。
           EOF
           fi
 

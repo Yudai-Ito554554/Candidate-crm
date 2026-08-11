@@ -48,4 +48,28 @@ describe("desktop artifact workflow", () => {
       workflow.indexOf("Upload unsigned QA artifacts"),
     );
   });
+
+  it("builds with the staging Tauri config so the QA app is named and identified distinctly from production", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain(
+      "npm run tauri build -- --config src-tauri/tauri.staging.conf.json",
+    );
+    expect(workflow).not.toMatch(/run: npm run tauri build\s*$/m);
+
+    expect(workflow).toContain(
+      "artifact_name: candidate-crm-staging-macos-unsigned",
+    );
+    expect(workflow).toContain(
+      "artifact_name: candidate-crm-staging-windows-unsigned",
+    );
+
+    expect(workflow).toContain("Candidate CRM STAGING macOS 社内QA版");
+    expect(workflow).toContain("Candidate CRM STAGING Windows 社内QA版");
+    expect(workflow).toContain("本番版（Candidate CRM）とは別アプリ");
+
+    expect(
+      workflow.indexOf("--config src-tauri/tauri.staging.conf.json"),
+    ).toBeLessThan(workflow.indexOf("Verify ad-hoc signed macOS bundles"));
+  });
 });
