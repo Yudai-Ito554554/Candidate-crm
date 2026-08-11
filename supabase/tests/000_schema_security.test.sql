@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(27);
+select extensions.plan(29);
 
 select extensions.ok(
   to_regclass('public.candidates') is not null,
@@ -314,6 +314,21 @@ select extensions.ok(
 select extensions.ok(
   exists (
     select 1
+    from pg_constraint
+    where conrelid = 'public.profiles'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) like '%suspended%'
+  )
+  and position(
+    '''suspended'''
+    in lower(pg_get_functiondef('public.set_profile_role(uuid,text)'::regprocedure))
+  ) > 0,
+  'suspended is a distinct profile role that administrators can assign'
+);
+
+select extensions.ok(
+  exists (
+    select 1
     from pg_policies
     where schemaname = 'public'
       and tablename = 'candidates'
@@ -336,6 +351,24 @@ select extensions.ok(
   and not has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.handle_new_user()', 'EXECUTE'),
   'anonymous users cannot execute role helpers and trigger functions are not API-callable'
+);
+
+select extensions.ok(
+  exists (
+    select 1
+    from pg_trigger
+    where tgrelid = 'auth.users'::regclass
+      and tgname = 'on_auth_user_email_updated'
+      and not tgisinternal
+      and lower(pg_get_triggerdef(oid)) like '%after update of email%'
+      and lower(pg_get_triggerdef(oid)) like '%old.email is distinct from new.email%'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.sync_profile_email_from_auth()',
+    'EXECUTE'
+  ),
+  'Auth email changes synchronize profiles through a non-callable trigger helper'
 );
 
 select extensions.ok(

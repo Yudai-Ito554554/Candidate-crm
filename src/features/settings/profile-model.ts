@@ -24,7 +24,8 @@ export const userInvitationSchema = z.object({
 });
 
 export const profileRoleLabels: Record<ProfileRole, string> = {
-  pending: "承認待ち・停止",
+  pending: "承認待ち",
+  suspended: "停止済み",
   admin: "管理者",
   agent: "エージェント",
   viewer: "閲覧者",

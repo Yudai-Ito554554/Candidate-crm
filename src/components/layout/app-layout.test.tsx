@@ -74,6 +74,24 @@ describe("AppLayout: 承認待ち・確認中画面のSTAGING表示", () => {
     expect(screen.queryByText("候補者")).not.toBeInTheDocument();
   });
 
+  it("停止済みユーザーには停止画面を表示し、業務データは表示しない", () => {
+    mocks.useAccessResult.role = "suspended";
+    render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        name: "このアカウントは利用停止中です",
+      }),
+    ).toBeVisible();
+    expect(screen.getByText("STAGING")).toBeVisible();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.queryByText("候補者")).not.toBeInTheDocument();
+  });
+
   it("productionでは確認中・承認待ちのどちらの画面でもSTAGINGバッジを表示しない", () => {
     mocks.environment.data.VITE_APP_ENV = "production";
     mocks.useAccessResult.isPending = true;

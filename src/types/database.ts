@@ -1,4 +1,5 @@
-export type ProfileRole = "pending" | "admin" | "agent" | "viewer";
+export type ProfileRole =
+  "pending" | "suspended" | "admin" | "agent" | "viewer";
 
 export type CandidateStatus =
   | "new"

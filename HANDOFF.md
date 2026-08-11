@@ -1,7 +1,7 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
 最終更新: 2026-08-11（Asia/Tokyo）
-最終確認HEAD: `d5a8fc1`（`fix: use bash for production target verification`）／`origin/main`と同期済み、作業ツリーはclean
+最終確認HEAD: `1fe0679`（`docs: add CRM implementation handoff`）／`origin/main`と同期済み
 
 このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。**コード変更はこの文書の作成時点では行っていません。**
 
@@ -19,6 +19,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 現在は「社内試験運用」フェーズで、プロジェクトオーナー本人によるproduction利用（Stage 2 Go判定済み）が進行中。外部顧客への一般提供（Stage 3）はまだ判定前。
 
 プロジェクト全体のルール・構造は `AGENTS.md` に集約されている。**作業前に必ず読むこと。** 特に重要な制約:
+
 - 物理DELETEは使わず、常に `archived_at` によるアーカイブ
 - `service_role`キー・`OPENAI_API_KEY`はEdge Function secretsのみ、Vite クライアントコードに絶対含めない
 - OS固有の絶対パスをtrackedファイルに含めない（`npm run verify:repo`が検査）
@@ -42,15 +43,16 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 7. **本番Stage 1・Stage 2の実施**（ユーザー本人がRunbookに沿って別途実施、`docs/production-go-no-go-checklist.md`に記録済み）: 上記2migrationのproduction適用、DB/Storageバックアップ、restore drill、production macOSビルドでのオーナー本人ログイン確認。**両段階ともGo判定済み。**
 8. **staging role UAT の実施**（commit `333ab18`, `d7f827f`）: 最新staging独立アプリでadmin/agent/viewer/pendingの実ログインを行い、権限UI非表示・データ保護UI（未保存離脱確認等）を確認。`docs/production-go-no-go-checklist.md`のStage 3項目S3-2, S3-4, S3-8, S3-9を完了に更新。
 9. **候補者CSV/履歴書インポート機能の追加**（commit `619f3d3`）: `/candidates/import`ページ、CSV取り込み（UTF-8/Shift_JIS、最大2MB・1,000名、列自動対応、重複検知）、履歴書テキスト貼り付け解析、Tauri Rust側でのPDF文字抽出（最大5MB）。詳細はREADME「候補者データ取り込み」節。
-10. **production接続の社内検証用ビルドパイプライン追加**（commit `9cbedc5`, `d5a8fc1`）: `.github/workflows/production-internal-artifacts.yml`（新規）と`scripts/verify-build-target.mjs`（新規）。40桁commit SHAと確認文字列の入力必須、`EXPECTED_PRODUCTION_REF`/`FORBIDDEN_STAGING_REF`によるビルド前後の接続先検証、GitHub Environment `production-internal-build`経由でproduction専用secretsを分離。**まだ一度も実行していない**（詳細は4節参照）。
+10. **production接続の社内検証用ビルドパイプライン追加・実行**（commit `9cbedc5`, `d5a8fc1`）: `.github/workflows/production-internal-artifacts.yml`（新規）と`scripts/verify-build-target.mjs`（新規）。40桁commit SHAと確認文字列の入力必須、`EXPECTED_PRODUCTION_REF`/`FORBIDDEN_STAGING_REF`によるビルド前後の接続先検証、GitHub Environment `production-internal-build`経由でproduction専用secretsを分離。Run `31482456482`でmacOS・Windowsの両成果物が成功し、source commit `d5a8fc1`との一致とmacOS成果物のSHA256・ad-hoc署名を確認済み。一般配布は禁止。
 
 ---
 
 ## 3. 現在作業中の内容
 
-**明確に「作業中」と言えるタスクは現時点でなし。** 直前のcommit（`d5a8fc1`）まででこのHANDOFF.md作成時点の作業ツリーはclean、`origin/main`と同期済み。
+**明確に「作業中」と言える実装タスクは現時点でなし。** 現在のHEADは`1fe0679`で、`origin/main`と同期済み。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
+
 - **Stage 3（外部顧客への一般提供）判定**: 14項目中、Go/No-Go未記入。多くの重大項目が未着手（詳細は4節）。
 - **社内試験運用のWindows展開**: 次の最優先事項としてドキュメント上で明言されているが、Windows実機自体がまだない状態。
 
@@ -58,17 +60,17 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 
 ## 4. 未完了の内容（`docs/production-go-no-go-checklist.md` Stage 3表が正）
 
-| 項目 | 状態 | 内容 |
-|---|---|---|
-| S3-1 | ☐ | Stage 2 Go後の内部利用期間の経過待ち（期間はリリース判断者が定める） |
-| S3-3 | ☐ | viewerがURL直接入力で編集画面を開けないことの**実アカウントでの直接URL確認**（自動テストは済み。Tauriアプリにはブラウザのアドレスバーがないため、確認方法自体をどう定めるか未決定） |
-| S3-5 | ☐ | 招待メールフローの実メール確認（Supabase Freeプランはオーナー本人のメールアドレスにしか送信できない制約あり） |
-| S3-6 | ☐ | AI求人取り込み例外系のmacOS/Windows実機での一連のUAT（自動テストは済み） |
-| S3-7 | △一部 | 企業・求人の重複/アーカイブ/復元の実地確認が未実施（候補者のみ確認済み） |
-| S3-10 | ☐ | **Windows実機でのインストール/起動/終了/再起動/アンインストール確認。次の最優先項目。** |
-| S3-11 | ☐ | macOSコード署名・Notarization（Apple Developer Program未登録） |
-| S3-12 | ☐ | Windowsコード署名（証明書未取得） |
-| S3-13 | ☐ | 一般配布用の正式署名済みビルドパイプライン（社内検証用の未署名版は実装済み、実行待ち） |
+| 項目  | 状態  | 内容                                                                                                                                                                                |
+| ----- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S3-1  | ☐     | Stage 2 Go後の内部利用期間の経過待ち（期間はリリース判断者が定める）                                                                                                                |
+| S3-3  | ☐     | viewerがURL直接入力で編集画面を開けないことの**実アカウントでの直接URL確認**（自動テストは済み。Tauriアプリにはブラウザのアドレスバーがないため、確認方法自体をどう定めるか未決定） |
+| S3-5  | ☐     | 招待メールフローの実メール確認（Supabase Freeプランはオーナー本人のメールアドレスにしか送信できない制約あり）                                                                       |
+| S3-6  | ☐     | AI求人取り込み例外系のmacOS/Windows実機での一連のUAT（自動テストは済み）                                                                                                            |
+| S3-7  | △一部 | 企業・求人の重複/アーカイブ/復元の実地確認が未実施（候補者のみ確認済み）                                                                                                            |
+| S3-10 | ☐     | **Windows実機でのインストール/起動/終了/再起動/アンインストール確認。次の最優先項目。**                                                                                             |
+| S3-11 | ☐     | macOSコード署名・Notarization（Apple Developer Program未登録）                                                                                                                      |
+| S3-12 | ☐     | Windowsコード署名（証明書未取得）                                                                                                                                                   |
+| S3-13 | ☐     | 一般配布用の正式署名済みビルドパイプライン（社内検証用の未署名版は実装・実行済み）                                                                                                  |
 
 B区分（どの段階も妨げないが未確認）: ホーム/今日の予定/Inbox/全体検索/オフライン通知のUI動作確認（B-1）、サイドバー折り畳み・キーボード操作・フォーカス表示の網羅確認（B-2、ファイルアーカイブモーダルのみ対応済み）、macOSディープリンクの実地確認（B-3）、未署名QA版の運用ルール整備（B-5）。
 
@@ -76,7 +78,7 @@ C区分（外部契約・実機・有料プラン待ち）: Windows実機（C-1�
 
 D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook同期のOAuth連携・同期処理（型定義の列挙値のみ存在、Edge Function・同期サービス本体は未実装）。
 
-`production-internal-artifacts.yml`は実装済みだが**未実行**。初回実行前にGitHub Environment `production-internal-build`へ`PROD_VITE_SUPABASE_URL`と`PROD_VITE_SUPABASE_PUBLISHABLE_KEY`を登録する必要がある（`service_role`キーは登録しないこと）。
+`production-internal-artifacts.yml`はRun `31482456482`で実行済み。GitHub Environment `production-internal-build`にはproduction用URLとpublishable keyだけを分離して登録し、`service_role`キーは登録していない。
 
 ---
 
@@ -108,6 +110,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 ## 7. 変更した主要ファイル（このセッション内、カテゴリ別）
 
 **Tauri設定・ビルド**
+
 - `src-tauri/tauri.staging.conf.json`（新規）
 - `src-tauri/tauri.conf.json`（本番、無変更のまま維持）
 - `.github/workflows/desktop-artifacts.yml`（staging config引数・artifact名変更）
@@ -115,10 +118,12 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 - `scripts/verify-build-target.mjs`（新規）
 
 **セキュリティmigration**
+
 - `supabase/migrations/20260808003737_restrict_email_thread_update_columns.sql`
 - `supabase/migrations/20260808043603_restrict_files_update_columns.sql`
 
 **staging/production区別**
+
 - `src/lib/env.ts`, `src/vite-env.d.ts`
 - `src/components/common/environment-badge.tsx`（+test）
 - `src/components/layout/app-layout.tsx`（+test）
@@ -126,9 +131,11 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 - `src/pages/login-page.tsx`, `src/pages/forgot-password-page.tsx`, `src/pages/set-password-page.tsx`
 
 **ファイルアーカイブ確認モーダル**
+
 - `src/components/common/entity-files.tsx`（+test）
 
 **候補者CSV/履歴書インポート**（commit `619f3d3`、詳細機能はREADME参照）
+
 - `src/pages/candidate-import-page.tsx`（新規）
 - `src/features/candidates/candidate-csv-import-panel.tsx`（新規）
 - `src/features/candidates/candidate-resume-import-panel.tsx`（新規）
@@ -140,6 +147,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 - `src-tauri/src/lib.rs`（PDF文字抽出のRustコマンド追加）, `src-tauri/Cargo.toml`
 
 **ドキュメント**
+
 - `docs/production-release-runbook.md`（新規、1210行）
 - `docs/production-go-no-go-checklist.md`（新規、Stage 1〜3判定表。**現在の正式な進捗管理表、必ずこれを見ること**）
 - `docs/uat-checklist.md`（新規、業務受け入れテスト観点。CSV取り込み関連観点を追加済み）
@@ -153,7 +161,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 
 - **テストのflaky挙動を確認**: `src/pages/app-routes.test.tsx`の全体検索テスト（"佐藤"検索→`findByRole("heading", { name: "佐藤 健太" })`）が、フルテストスイート実行時に稀にタイムアウトで失敗することを本ドキュメント作成時に確認した（1回失敗/3回中）。単独実行では常に成功（92/92）。原因未調査だが、フルスイート実行時の並列ワーカー負荷によるタイミング依存の疑いが強い。**業務ロジックのバグではなくテストの安定性の問題である可能性が高いが、次に触る人は原因を確認すること。**
 - **S3-3（viewerの編集URL直接アクセス拒否）の実機検証方法が未確定**: Tauriアプリにはブラウザのアドレスバーに相当するUIがなく、「URLを直接入力する」という検証手順をどう再現するか、Runbook/UATチェックリスト上でも解決していない。自動回帰テストでは6ルート（候補者・求人・企業の新規/編集）を確認済みだが、実機での確認が求められている。
-- **`production-internal-artifacts.yml`は未実行**: GitHub Environment `production-internal-build`にsecretsを登録していないため、初回実行するとおそらく`VITE_SUPABASE_URL`未設定でビルド前の検証ステップが失敗する。実行前にsecrets登録が必須。
+- **最新HEADの通常CIは文書整形で失敗**: Run `31488166882`ではSupabase migration/policy jobは成功したが、macOS・Windows quality checksが本`HANDOFF.md`のPrettier未整形で停止した。アプリコードやDBテストの失敗ではなく、文書整形を直してCIをgreenへ戻す必要がある。
 - **Windows側の未検証事項が多い**: staging独立アプリのproductName/identifier反映、PDFドラッグ&ドロップ、インストーラー全体の動作、いずれもWindows実機がないためCI上の自動テストのみで裏付けられており、実機確認が残っている。
 - **既知の未実装領域**（バグではなく仕様上のスコープ外、README「現在の範囲外」節に明記）: Gmail/Outlook同期のOAuth・同期処理本体、メール送信/返信、ウイルススキャン、ファイル版管理、Googleログイン、カレンダー・Slack連携、検索履歴・高度な検索条件、複数組織対応、監査ログの長期保管・エクスポート、外部エラー監視サービス連携。
 
@@ -165,7 +173,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 - 直近の実行結果: **65 test files / 339 tests、全件成功**（上記のflaky事例を除く。フルスイートを2回連続実行してどちらも339/339成功を確認済み）
 - テスト方針: `vi.hoisted()`で共有モック状態を持つ、`vi.mock("@/lib/env", ...)`パターン、ワークフローYAMLやJSON設定ファイルは`node:fs/promises`で実ファイルを読み文字列アサーションする方式（`src/test/*.test.ts`）
 - DB側のテスト: `supabase/tests`にpgTAPテストがあり、外部キー・RLS・クライアント権限・サーバー専用テーブルを検証。CIのDBジョブはUbuntu上のローカルSupabaseに全migrationを適用して実行（リモート接続なし、秘密情報不使用）。`npm run supabase:test`で実行可能（ローカルSupabase起動が前提）。
-- CI: 通常CI（macOS/Windows/Supabaseの3ジョブ）は最新pushで全て成功（commit `beb843d`時点で確認、それ以降のcommitでも継続してCIは通っている前提だが、`619f3d3`以降のCI実行結果はこのHANDOFF.mdでは個別確認していない。**次の作業者は`gh run list --branch main --limit 5`で最新の実行結果を確認すること**）。
+- CI: commit `d5a8fc1`の通常CI Run `31482312635`は全3ジョブ成功。最新HEAD `1fe0679`のRun `31488166882`はSupabase migration/policy jobが成功し、macOS・Windows quality checksは本`HANDOFF.md`のPrettier未整形だけで停止した。アプリコードの型チェック・テスト・ビルド不良ではない。
 
 ---
 
@@ -228,11 +236,13 @@ npm run supabase:stop
 ## 11. 次のAIが作業を再開するための具体的な手順
 
 1. **状況確認**（コード変更前に必ず実行）:
+
    ```sh
    git status
    git log --oneline -10
    gh run list --branch main --limit 5
    ```
+
    `git status`がcleanでないなら、それが誰の作業か（自分がこれから始める作業か、前回セッションの続きか）をユーザーに確認する。
 
 2. **必読ドキュメント**（優先順）:

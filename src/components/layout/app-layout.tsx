@@ -122,6 +122,40 @@ export function AppLayout() {
     );
   }
 
+  if (access.role === "suspended") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <section
+          className="w-full max-w-md rounded-lg border border-rose-200 bg-white p-6 shadow-sm"
+          role="alert"
+        >
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-slate-950">
+              このアカウントは利用停止中です
+            </h1>
+            <EnvironmentBadge environmentName={environmentName} />
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Candidate CRMへのアクセスは管理者により停止されています。
+            再開が必要な場合は管理者へお問い合わせください。
+          </p>
+          <p className="mt-3 text-xs text-slate-500">{userLabel}</p>
+          {logoutError ? (
+            <p className="mt-3 text-sm text-rose-700">{logoutError}</p>
+          ) : null}
+          <button
+            className="mt-5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            disabled={isSigningOut}
+            onClick={() => void handleSignOut()}
+            type="button"
+          >
+            {isSigningOut ? "ログアウト中…" : "ログアウト"}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <aside
