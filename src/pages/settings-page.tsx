@@ -189,6 +189,11 @@ export function SettingsPage() {
                       }
                       value={profile.role}
                     >
+                      {profile.role === "pending" ? (
+                        <option disabled value="pending">
+                          {profileRoleLabels.pending}
+                        </option>
+                      ) : null}
                       {profileRoles.map(([value, label]) => (
                         <option key={value} value={value}>
                           {label}

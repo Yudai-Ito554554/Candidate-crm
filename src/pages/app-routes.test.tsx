@@ -2531,14 +2531,34 @@ describe("Candidate CRM Phase 2.5 routes", () => {
           created_at: "2026-08-01T00:00:00Z",
           updated_at: "2026-08-01T00:00:00Z",
         },
+        {
+          id: "user-003",
+          display_name: "承認待ち担当",
+          email: "pending@example.com",
+          role: "pending",
+          created_at: "2026-08-01T00:00:00Z",
+          updated_at: "2026-08-01T00:00:00Z",
+        },
       ],
       error: null,
     });
     renderRoute("/settings");
-    await user.selectOptions(
-      await screen.findByRole("combobox", { name: "閲覧担当のロール" }),
-      "suspended",
-    );
+
+    const viewerRoleSelect = await screen.findByRole("combobox", {
+      name: "閲覧担当のロール",
+    });
+    expect(
+      within(viewerRoleSelect).queryByRole("option", { name: "承認待ち" }),
+    ).not.toBeInTheDocument();
+
+    const pendingRoleSelect = screen.getByRole("combobox", {
+      name: "承認待ち担当のロール",
+    });
+    expect(
+      within(pendingRoleSelect).getByRole("option", { name: "承認待ち" }),
+    ).toBeDisabled();
+
+    await user.selectOptions(viewerRoleSelect, "suspended");
 
     await waitFor(() =>
       expect(candidateMocks.setProfileRole).toHaveBeenCalledWith(
