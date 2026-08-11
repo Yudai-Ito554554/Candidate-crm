@@ -31,7 +31,13 @@ export const profileRoleLabels: Record<ProfileRole, string> = {
   viewer: "閲覧者",
 };
 
-export const profileRoles = Object.entries(profileRoleLabels) as [
-  ProfileRole,
-  string,
-][];
+const assignableProfileRoleValues = [
+  "admin",
+  "agent",
+  "viewer",
+  "suspended",
+] as const satisfies readonly Exclude<ProfileRole, "pending">[];
+
+export const profileRoles = assignableProfileRoleValues.map(
+  (role) => [role, profileRoleLabels[role]] as const,
+);
