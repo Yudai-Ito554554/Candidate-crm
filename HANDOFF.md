@@ -1,11 +1,18 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
-最終更新: 2026-08-11（Asia/Tokyo）
-レビュー基準HEAD: `76f789c`（`fable5-review-fixes`）／`origin/main`は`1fe0679`のまま変更なし
+最終更新: 2026-08-12（Asia/Tokyo）
+レビュー基準HEAD: `0e02ad4`（`fable5-review-fixes`）／`origin/main`は`1fe0679`のまま変更なし
 
 このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Batch 1変更はレビュー用ブランチ`fable5-review-fixes`へpush済みで、`main`には未反映です。
 
 ---
+
+## 0. CodexとFable 5の役割分担
+
+- **Codex**: コード・migration・テスト・文書の実装、修正、検証、commit、pushを担当する。
+- **Fable 5**: 設計提案、設計書の作成・更新、セキュリティレビュー、Codexが実装した差分のレビューを担当する。
+
+Fable 5には実装作業を依頼しない。Fable 5へ渡す依頼はMarkdownファイルとして`docs`に保存し、設計上の論点、セキュリティ境界、レビュー対象差分、Codexが実装するための受け入れ条件を明記する。Fable 5から修正指摘を受けた場合は、Codexが実装・テスト・commit・pushを行う。
 
 ## 1. このプロジェクトの目的
 
