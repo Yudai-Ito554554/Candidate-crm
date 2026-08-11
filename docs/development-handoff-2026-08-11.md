@@ -5,7 +5,7 @@
 ## 現在の位置
 
 - branch: `main`
-- このチェックポイントでcommitするHEAD（予定）: 本ドキュメント作成直前は`b5562d801d729f3d593fb498a6a1b94bbe2deecb`（commit `b5562d8`、`fix: show staging badge on gated auth screens`）。本チェックポイント作業で新規commitを1つ追加し`origin/main`へpushする。
+- 現在の検証対象HEAD: `beb843d6c61e185a0ea4381988de069e4a4672d1`（commit `beb843d`、`docs: format development handoff`）。staging独立アプリ化はcommit `280731b`で完了済み。
 - 「STAGING独立アプリ化」の実装・ローカル検証・必須チェックはすべて完了したため、**checkpointブランチではなくmainへ直接commitする**（詳細は下記）。
 
 ## 完了した工程（このセッション内、時系列）
@@ -17,13 +17,16 @@
 5. Stage 3権限UATの一部として、pendingテストユーザー`uat-pending@example-uat.invalid`をstaging（`admjgbfrfoczpxdtxmgy`）に作成（ロールはデフォルトの`pending`のまま）
 6. UAT中に発見: pendingユーザー向け画面（利用承認待ち・アクセス権限確認中）とログイン確認中画面でSTAGINGバッジが表示されない不具合
 7. `fix: show staging badge on gated auth screens`（commit `b5562d8`、push済み）で修正。回帰テスト5件追加。通常CI・Desktop QA artifactsとも成功確認済み
-8. 「Candidate CRM STAGINGを本番版と共存できる独立アプリにする」実装・ローカル検証（本チェックポイントの主題、完了。詳細は次項）
+8. 「Candidate CRM STAGINGを本番版と共存できる独立アプリにする」実装・ローカル検証（commit `280731b`、完了。詳細は次項）
+9. commit `280731b`のCIで引き継ぎ文書のPrettier違反を検出し、commit `beb843d`で文書のみ修正。通常CIの3ジョブとDesktop QA artifactsのmacOS/Windows両ジョブが成功
+10. 最新のstaging独立アプリ（commit `beb843d`）でadmin・viewer・agentの実ログインUATを実施。admin限定設定の表示、viewerの書き込み/AI生成UI非表示、agentの候補者関連タスク作成・完了を確認
 
 ## CI・QA成果物URL
 
 - 通常CI（commit `b5562d8`）: <https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31433816989>（成功）
 - Desktop QA artifacts（commit `b5562d8`、独立アプリ化前）: <https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31438901217>（成功、`candidate-crm-macos-unsigned`・`candidate-crm-windows-unsigned`を生成）
-- 本チェックポイントでpushするcommit（独立アプリ化後）のCI・Desktop QA artifactsは**まだ実行していない**。次回、push後に手動実行して最終確認する。
+- 通常CI（commit `beb843d`）: <https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31455935492>（macOS・Windows・Supabaseの3ジョブすべて成功）
+- Desktop QA artifacts（commit `beb843d`）: <https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31456232108>（macOS・Windowsとも成功、`candidate-crm-staging-macos-unsigned`・`candidate-crm-staging-windows-unsigned`を生成）
 
 ## stagingとproductionの区別（現状の実装）
 
@@ -33,20 +36,19 @@
 
 ## Stage 3 UATの完了・未完了項目（`docs/production-go-no-go-checklist.md`参照）
 
-現時点でS3-2・S3-3・S3-4・S3-8は**すべて未チェック（☐）のまま**（本チェックポイントでは更新していない）。裏付けとして自動回帰テストは通っているが、**実際のstaging QAビルドへ実ログインしての画面確認はまだ未実施**。
+最新のstaging独立アプリへ実ログインして権限UATを実施した。S3-2・S3-4・S3-8は完了。S3-3はTauriアプリにURL入力欄がないため、実画面での直接URL確認が残る。
 
-| 項目                                    | 状態     | 根拠                                                      |
-| --------------------------------------- | -------- | --------------------------------------------------------- |
-| S3-2（viewer: 書き込み/AI生成UI非表示） | ☐ 未確認 | 自動回帰テストのみ確認済み。実ログイン未実施              |
-| S3-3（viewer: 編集URL直接アクセス拒否） | ☐ 未確認 | 自動回帰テストのみ確認済み。実ログイン未実施              |
-| S3-4（pending: 業務データ非表示）       | ☐ 未確認 | 自動回帰テストのみ確認済み。実ログイン未実施              |
-| S3-8（admin限定機能）                   | ☐ 未確認 | DBレベルRLS・自動回帰テストのみ確認済み。実ログイン未実施 |
+| 項目                                    | 状態     | 根拠                                                                                             |
+| --------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| S3-2（viewer: 書き込み/AI生成UI非表示） | ☒ 完了   | viewer実ログインで管理者設定、候補者書き込み、AI生成UIの非表示を確認。残りは自動回帰テストで補完 |
+| S3-3（viewer: 編集URL直接アクセス拒否） | ☐ 未確認 | 自動回帰テスト済み。Tauri実画面での直接URL検証方法の確定が必要                                   |
+| S3-4（pending: 業務データ非表示）       | ☒ 完了   | pending実ログインで承認待ち画面のみ表示。最新バッジとrepository非呼び出しは回帰テストで補完      |
+| S3-8（admin限定機能）                   | ☒ 完了   | adminで招待・チーム管理・監査ログ表示、viewerで管理機能非表示を実確認                            |
 
 ## pendingユーザー確認結果
 
 - staging（`admjgbfrfoczpxdtxmgy`）に`uat-pending@example-uat.invalid`を作成済み（ロールは自動で`pending`、変更していない）。
-- このユーザーでの実際のログイン確認（S3-4の実地検証）は、STAGINGバッジ不具合の発見・修正、続く独立アプリ化作業に工程が移ったため、**まだ完了していない**。
-- 次回再開時は、まずこのpendingユーザーで最新のstaging独立アプリ版（次回Desktop QA artifacts実行後の`candidate-crm-staging-macos-unsigned`）にログインし、S3-2〜S3-4・S3-8を1つずつ確認して`docs/production-go-no-go-checklist.md`へ証跡を記録する。
+- pending実アカウントで承認待ち画面のみ表示され、業務画面へ到達しないことを実確認済み。最新staging独立アプリでSTAGINGバッジが表示されることも確認済み。
 
 ## 今回完了: 「Candidate CRM STAGINGを独立アプリ化する」
 
@@ -84,9 +86,15 @@
 
 ### 次回再開時にやること
 
-1. push後、通常CIとDesktop QA artifactsを実行し、特にWindows成果物のproductName/identifier反映を確認する。
-2. `uat-pending@example-uat.invalid`で最新のstaging独立アプリ版にログインし、Stage 3 UAT（S3-2・S3-3・S3-4・S3-8）を実施、`docs/production-go-no-go-checklist.md`へ証跡を記録する。
-3. 同様にviewer（`uat-viewer@example-uat.invalid`）・admin（`uat-admin@example-uat.invalid`）でもS3-2/S3-3/S3-8を実施する。
+1. S3-3の「viewerによる編集URL直接アクセス拒否」を、Tauri実アプリ上で再現できる検証方法を決めて確認する（自動回帰テストは成功済み）。
+2. Stage 3の残項目（招待メール、AI求人取り込み例外系、重複/アーカイブ、未保存離脱、Windows実機、署名、公証等）を優先順位順に進める。
+
+## 将来改善: ログイン情報の入力省略
+
+- 利用者から「テストや日常利用でメールアドレスとパスワードを毎回入力・貼り付けるのが負担」と要望あり。
+- メールアドレスは安全に保存して自動入力できるようにする。
+- パスワードやセッション以外の認証情報を`localStorage`へ保存しない。実装時はmacOS Keychain・Windows Credential ManagerなどOSの安全な資格情報保管、またはOS標準のパスワード自動入力連携を採用する。
+- 本番一般提供前の必須項目ではなく、現行UAT完了後のUX改善バックログとして扱う。
 
 ```sh
 # リポジトリルートで実行する
