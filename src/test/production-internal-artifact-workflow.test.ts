@@ -33,6 +33,12 @@ describe("production internal artifact workflow", () => {
     expect(workflow).toContain("EXPECTED_PRODUCTION_REF: dsaqarejqslzgcatkxeh");
     expect(workflow).toContain("FORBIDDEN_STAGING_REF: admjgbfrfoczpxdtxmgy");
     expect(workflow).toContain("scripts/verify-build-target.mjs");
+    expect(workflow).toMatch(
+      /Verify production build environment without printing secrets\n\s+shell: bash/,
+    );
+    expect(workflow).toMatch(
+      /Verify built frontend targets production only\n\s+shell: bash/,
+    );
     expect(workflow).not.toContain("SERVICE_ROLE");
     expect(workflow).not.toContain("secrets.VITE_SUPABASE_URL");
   });
