@@ -1,0 +1,264 @@
+# Candidate CRM 引き継ぎ文書（HANDOFF）
+
+最終更新: 2026-08-11（Asia/Tokyo）
+最終確認HEAD: `d5a8fc1`（`fix: use bash for production target verification`）／`origin/main`と同期済み、作業ツリーはclean
+
+このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。**コード変更はこの文書の作成時点では行っていません。**
+
+---
+
+## 1. このプロジェクトの目的
+
+Candidate CRM は、人材紹介・採用エージェンシー業務向けの Tauri 2（macOS/Windows）デスクトップCRMです。バックエンドはSupabase（Postgres + Auth + Storage + Edge Functions）。
+
+- フロントエンド: React 19 + TypeScript + Vite + TanStack Query + React Hook Form + Zod + Tailwind CSS
+- デスクトップシェル: Tauri 2（Rust）
+- バックエンド: Supabase（RLSをロール境界として使用。`admin`/`agent`が書き込み可、`viewer`は閲覧のみ、`pending`は承認待ちで業務データ非表示）
+- 主要ドメイン: 候補者（candidates）、企業（companies）、求人（jobs）、選考（applications）、パイプライン、活動（activities）、タスク、ファイル、Inbox、ホーム集約、レポート、AI求人票取り込み、AI候補者サマリー、監査ログ
+
+現在は「社内試験運用」フェーズで、プロジェクトオーナー本人によるproduction利用（Stage 2 Go判定済み）が進行中。外部顧客への一般提供（Stage 3）はまだ判定前。
+
+プロジェクト全体のルール・構造は `AGENTS.md` に集約されている。**作業前に必ず読むこと。** 特に重要な制約:
+- 物理DELETEは使わず、常に `archived_at` によるアーカイブ
+- `service_role`キー・`OPENAI_API_KEY`はEdge Function secretsのみ、Vite クライアントコードに絶対含めない
+- OS固有の絶対パスをtrackedファイルに含めない（`npm run verify:repo`が検査）
+- スキーマ変更は必ず`supabase/migrations`の順序付きファイルで行う（Dashboard直接変更禁止）
+- RLSなしのビジネステーブルを作らない
+
+---
+
+## 2. 現在までに実装した内容（機能面、README.mdのPhase一覧が正式な記録）
+
+`README.md` にPhase 2.5〜Phase 6Kまでの全実装履歴が時系列で記載されている（候補者/企業/求人CRUD、パイプライン、選考管理、活動/タスク、ファイル管理、Inbox、ホーム、レポート、監査ログ、AI候補者サマリー、AI求人票取り込み〔テキスト/PDF/URL、根拠表示、企業照合、キャッシュ等〕、ロール権限、閲覧専用UI、未保存変更保護、重複警告、アーカイブ/復元 等）。**機能の詳細を知りたい場合はREADMEの該当Phase節を参照すること（このHANDOFF.mdでは再掲しない）。**
+
+このセッションで新規に行った作業（時系列、git log降順の逆）:
+
+1. **本番セキュリティ修正**（commit `692fffe`ほか）: `email_threads`/`files`テーブルの列単位UPDATE権限に不備があり、`authenticated`ロールに対して意図した列（`status`/`archived_at`のみ等）以外も更新可能だった。原因はPostgresのGRANTが加算的であり、列スコープGRANTの前に`REVOKE UPDATE ON TABLE ... FROM authenticated`をしていなかったこと。2migrationで修正（`supabase/migrations/20260808003737_*.sql`, `20260808043603_*.sql`）。
+2. **ファイルアーカイブ確認ダイアログの修正**（commit `7bbc5de`, `dc8bd81`）: `window.confirm()`がTauri WebView内で無反応（ダイアログが出ずmutationも発火しない）だったため、独自Reactモーダルに置き換え。見出し+`aria-labelledby`、初期フォーカス、Escape、フォーカストラップ、フォーカス復帰まで実装。
+3. **production移行用ドキュメント作成**: `docs/production-release-runbook.md`（1210行、本番作業の全手順）、`docs/production-go-no-go-checklist.md`（3段階Go/No-Go判定表）。複数回のレビューで堅牢化（BACKUP_DIRのポインタファイル化、fail-closedな接続文字列検証、`set -euo pipefail`＋マーカーファイルによるゲート、`npm ci`化等）。
+4. **staging/production のUI上の視覚的区別**（commit `369c956`）: `VITE_APP_ENV`（`staging`|`production`、zod検証、デフォルト`production`）を導入し、`EnvironmentBadge`コンポーネントでSTAGINGバッジを表示。
+5. **認証ゲート画面のSTAGINGバッジ欠落バグ修正**（commit `b5562d8`）: ログイン確認中画面・pending承認待ち画面にバッジがなかった不具合を修正。
+6. **staging QA版の独立アプリ化**（commit `280731b`, `beb843d`）: `src-tauri/tauri.staging.conf.json`を新規追加し、`productName`/`identifier`/ウィンドウタイトルを本番と別にした（本番用`tauri.conf.json`は無変更）。これにより`/Applications`へ本番版とstaging版を同時に置ける。Desktop QA artifacts workflowを`--config src-tauri/tauri.staging.conf.json`でビルドするよう変更。ローカルで実機ビルド・共存を検証済み。
+7. **本番Stage 1・Stage 2の実施**（ユーザー本人がRunbookに沿って別途実施、`docs/production-go-no-go-checklist.md`に記録済み）: 上記2migrationのproduction適用、DB/Storageバックアップ、restore drill、production macOSビルドでのオーナー本人ログイン確認。**両段階ともGo判定済み。**
+8. **staging role UAT の実施**（commit `333ab18`, `d7f827f`）: 最新staging独立アプリでadmin/agent/viewer/pendingの実ログインを行い、権限UI非表示・データ保護UI（未保存離脱確認等）を確認。`docs/production-go-no-go-checklist.md`のStage 3項目S3-2, S3-4, S3-8, S3-9を完了に更新。
+9. **候補者CSV/履歴書インポート機能の追加**（commit `619f3d3`）: `/candidates/import`ページ、CSV取り込み（UTF-8/Shift_JIS、最大2MB・1,000名、列自動対応、重複検知）、履歴書テキスト貼り付け解析、Tauri Rust側でのPDF文字抽出（最大5MB）。詳細はREADME「候補者データ取り込み」節。
+10. **production接続の社内検証用ビルドパイプライン追加**（commit `9cbedc5`, `d5a8fc1`）: `.github/workflows/production-internal-artifacts.yml`（新規）と`scripts/verify-build-target.mjs`（新規）。40桁commit SHAと確認文字列の入力必須、`EXPECTED_PRODUCTION_REF`/`FORBIDDEN_STAGING_REF`によるビルド前後の接続先検証、GitHub Environment `production-internal-build`経由でproduction専用secretsを分離。**まだ一度も実行していない**（詳細は4節参照）。
+
+---
+
+## 3. 現在作業中の内容
+
+**明確に「作業中」と言えるタスクは現時点でなし。** 直前のcommit（`d5a8fc1`）まででこのHANDOFF.md作成時点の作業ツリーはclean、`origin/main`と同期済み。
+
+ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
+- **Stage 3（外部顧客への一般提供）判定**: 14項目中、Go/No-Go未記入。多くの重大項目が未着手（詳細は4節）。
+- **社内試験運用のWindows展開**: 次の最優先事項としてドキュメント上で明言されているが、Windows実機自体がまだない状態。
+
+---
+
+## 4. 未完了の内容（`docs/production-go-no-go-checklist.md` Stage 3表が正）
+
+| 項目 | 状態 | 内容 |
+|---|---|---|
+| S3-1 | ☐ | Stage 2 Go後の内部利用期間の経過待ち（期間はリリース判断者が定める） |
+| S3-3 | ☐ | viewerがURL直接入力で編集画面を開けないことの**実アカウントでの直接URL確認**（自動テストは済み。Tauriアプリにはブラウザのアドレスバーがないため、確認方法自体をどう定めるか未決定） |
+| S3-5 | ☐ | 招待メールフローの実メール確認（Supabase Freeプランはオーナー本人のメールアドレスにしか送信できない制約あり） |
+| S3-6 | ☐ | AI求人取り込み例外系のmacOS/Windows実機での一連のUAT（自動テストは済み） |
+| S3-7 | △一部 | 企業・求人の重複/アーカイブ/復元の実地確認が未実施（候補者のみ確認済み） |
+| S3-10 | ☐ | **Windows実機でのインストール/起動/終了/再起動/アンインストール確認。次の最優先項目。** |
+| S3-11 | ☐ | macOSコード署名・Notarization（Apple Developer Program未登録） |
+| S3-12 | ☐ | Windowsコード署名（証明書未取得） |
+| S3-13 | ☐ | 一般配布用の正式署名済みビルドパイプライン（社内検証用の未署名版は実装済み、実行待ち） |
+
+B区分（どの段階も妨げないが未確認）: ホーム/今日の予定/Inbox/全体検索/オフライン通知のUI動作確認（B-1）、サイドバー折り畳み・キーボード操作・フォーカス表示の網羅確認（B-2、ファイルアーカイブモーダルのみ対応済み）、macOSディープリンクの実地確認（B-3）、未署名QA版の運用ルール整備（B-5）。
+
+C区分（外部契約・実機・有料プラン待ち）: Windows実機（C-1）、Apple Developer Program（C-2）、Windowsコード署名証明書（C-3）、Supabase Proプランへの移行判断（C-4/C-5a/C-5b/C-6、現状はFree継続決定済み）、カスタムSMTP（C-7）。
+
+D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook同期のOAuth連携・同期処理（型定義の列挙値のみ存在、Edge Function・同期サービス本体は未実装）。
+
+`production-internal-artifacts.yml`は実装済みだが**未実行**。初回実行前にGitHub Environment `production-internal-build`へ`PROD_VITE_SUPABASE_URL`と`PROD_VITE_SUPABASE_PUBLISHABLE_KEY`を登録する必要がある（`service_role`キーは登録しないこと）。
+
+---
+
+## 5. 次に実装すべき内容（優先順位順、ドキュメント上の合意事項）
+
+1. **Windows実機でのstaging版UAT**（`docs/uat-checklist.md`に沿って）: インストール・起動・終了・再起動・アンインストール（S3-10）。社内の他利用者はWindowsを使うため最優先。
+2. **S3-3の検証方法確定**: TauriアプリにURLバーがないため、viewerで直接編集URLへ遷移する方法（例: ディープリンクや開発者ツール経由）を決めて実施する。
+3. **S3-7の企業・求人アーカイブ/復元の実地確認**（候補者は完了済み）。
+4. Stage 3残項目（招待メールの実地確認、AI求人取り込み例外系のOS実機一連UAT）を優先順位順に進める。
+5. 外部提供前に: Apple Developer Program登録・署名・Notarization（C-2）、Windowsコード署名証明書（C-3）、Supabase Proプランの再判定（C-4/C-5）。
+6. バックログ（Stage 3の必須項目ではない）: ログイン情報入力省略機能。メールアドレスの安全な自動入力、パスワードはOSのKeychain/Credential Manager等の安全な資格情報保管を使う（`localStorage`使用は`AGENTS.md`のルール上不可）。詳細は`docs/development-handoff-2026-08-11.md`の「将来改善」節。
+
+---
+
+## 6. 重要な設計判断とその理由
+
+- **`archived_at`による論理削除のみ、物理DELETEなし**: 候補者データの誤削除防止と監査要件のため。`AGENTS.md`で全エンティティに一貫適用。
+- **RLSをロール境界として使用し、クライアント側の表示制御は補助**: `admin`/`agent`が書き込み、`viewer`は閲覧のみ、`pending`はデータ非表示。UI側の非表示はUXのためであり、実際の権限境界はPostgres RLSで強制（`AGENTS.md`: "never treat client-side hiding as a substitute for RLS"）。
+- **列単位GRANTは加算的**: 広いテーブルレベルGRANTがあると列スコープGRANTだけでは制限できない。列制限を行う際は必ず`REVOKE`を先に行う（2migrationで実際に踏んだ教訓）。
+- **`window.confirm()`はTauri WebViewで信頼できない**: ネイティブダイアログではなくアプリ内モーダルで確認UIを実装する方針に統一。
+- **staging/productionの区別を2階層で実装**: (1) UI上のSTAGINGバッジ（`VITE_APP_ENV`）、(2) OSレベルでの別アプリ化（`tauri.staging.conf.json`によるproductName/identifier分離）。理由は、社内テスターが誤って本番アプリを使う/本番アプリを上書きするリスクを両面から防ぐため。
+- **Tauri `--config`はRFC 7396 JSON Merge Patch**: 配列は要素マージではなく丸ごと置換される。そのため`tauri.staging.conf.json`の`app.windows`は元の設定全体（width/height/minWidth/minHeight/dragDropEnabled/resizable/fullscreen）を複製した上でtitleだけ変えている。**この配列を部分的にしか書かないと、staging版のウィンドウサイズ制約等が silently消える。**
+- **production-internal-artifacts.ymlをstaging workflowと完全に分離**: secrets（`PROD_VITE_SUPABASE_URL`等をGitHub Environmentで隔離）、成果物名、確認文字列（`BUILD_PRODUCTION_INTERNAL`固定文字列入力必須）、40桁commit SHA必須、ビルド前後で`scripts/verify-build-target.mjs`により接続先refを機械的に検証。理由は、誤ってstaging用ビルドがproductionに接続する/その逆が起きるリスクを構造的に防ぐため。
+- **AIサマリー/求人取り込みはサーバー側（Edge Function）のみで生成**: `OPENAI_API_KEY`とモデルIDをクライアントに一切渡さない。AI入力はホワイトリスト方式で個人情報（氏名・メール・電話・生年月日・`private_notes`）を除外。
+- **Supabase Freeプラン継続（2026-08-11決定）**: 社内試験運用中はコスト優先。手動バックアップ（Runbook 2〜3節）で代替し、外部顧客への有料提供前にProへの移行を再判定する方針。この決定によりS3-5（招待メール）・C-4〜C-6が制約を受けている。
+
+---
+
+## 7. 変更した主要ファイル（このセッション内、カテゴリ別）
+
+**Tauri設定・ビルド**
+- `src-tauri/tauri.staging.conf.json`（新規）
+- `src-tauri/tauri.conf.json`（本番、無変更のまま維持）
+- `.github/workflows/desktop-artifacts.yml`（staging config引数・artifact名変更）
+- `.github/workflows/production-internal-artifacts.yml`（新規）
+- `scripts/verify-build-target.mjs`（新規）
+
+**セキュリティmigration**
+- `supabase/migrations/20260808003737_restrict_email_thread_update_columns.sql`
+- `supabase/migrations/20260808043603_restrict_files_update_columns.sql`
+
+**staging/production区別**
+- `src/lib/env.ts`, `src/vite-env.d.ts`
+- `src/components/common/environment-badge.tsx`（+test）
+- `src/components/layout/app-layout.tsx`（+test）
+- `src/features/auth/auth-loading-screen.tsx`（+test）, `src/features/auth/protected-route.tsx`
+- `src/pages/login-page.tsx`, `src/pages/forgot-password-page.tsx`, `src/pages/set-password-page.tsx`
+
+**ファイルアーカイブ確認モーダル**
+- `src/components/common/entity-files.tsx`（+test）
+
+**候補者CSV/履歴書インポート**（commit `619f3d3`、詳細機能はREADME参照）
+- `src/pages/candidate-import-page.tsx`（新規）
+- `src/features/candidates/candidate-csv-import-panel.tsx`（新規）
+- `src/features/candidates/candidate-resume-import-panel.tsx`（新規）
+- `src/features/candidates/candidate-import-model.ts`（新規, +test）
+- `src/features/candidates/candidate-form-model.ts`（新規）
+- `src/features/candidates/candidate-form.tsx`, `src/features/candidates/candidate-queries.ts`
+- `src/services/candidate-document-repository.ts`（新規, +test）, `src/services/candidates-repository.ts`
+- `src/components/layout/global-create-menu.tsx`, `src/router.tsx`, `src/pages/candidates-page.tsx`
+- `src-tauri/src/lib.rs`（PDF文字抽出のRustコマンド追加）, `src-tauri/Cargo.toml`
+
+**ドキュメント**
+- `docs/production-release-runbook.md`（新規、1210行）
+- `docs/production-go-no-go-checklist.md`（新規、Stage 1〜3判定表。**現在の正式な進捗管理表、必ずこれを見ること**）
+- `docs/uat-checklist.md`（新規、業務受け入れテスト観点。CSV取り込み関連観点を追加済み）
+- `docs/rollback-runbook.md`（新規、配布後の切り戻し手順）
+- `docs/development-handoff-2026-08-11.md`（前回セッションの詳細な作業ログ。本HANDOFF.mdより粒度が細かい時系列記録）
+- `README.md`（各Phaseの実装記録、セットアップ手順、品質チェック手順を随時追記）
+
+---
+
+## 8. 現在判明している問題・バグ
+
+- **テストのflaky挙動を確認**: `src/pages/app-routes.test.tsx`の全体検索テスト（"佐藤"検索→`findByRole("heading", { name: "佐藤 健太" })`）が、フルテストスイート実行時に稀にタイムアウトで失敗することを本ドキュメント作成時に確認した（1回失敗/3回中）。単独実行では常に成功（92/92）。原因未調査だが、フルスイート実行時の並列ワーカー負荷によるタイミング依存の疑いが強い。**業務ロジックのバグではなくテストの安定性の問題である可能性が高いが、次に触る人は原因を確認すること。**
+- **S3-3（viewerの編集URL直接アクセス拒否）の実機検証方法が未確定**: Tauriアプリにはブラウザのアドレスバーに相当するUIがなく、「URLを直接入力する」という検証手順をどう再現するか、Runbook/UATチェックリスト上でも解決していない。自動回帰テストでは6ルート（候補者・求人・企業の新規/編集）を確認済みだが、実機での確認が求められている。
+- **`production-internal-artifacts.yml`は未実行**: GitHub Environment `production-internal-build`にsecretsを登録していないため、初回実行するとおそらく`VITE_SUPABASE_URL`未設定でビルド前の検証ステップが失敗する。実行前にsecrets登録が必須。
+- **Windows側の未検証事項が多い**: staging独立アプリのproductName/identifier反映、PDFドラッグ&ドロップ、インストーラー全体の動作、いずれもWindows実機がないためCI上の自動テストのみで裏付けられており、実機確認が残っている。
+- **既知の未実装領域**（バグではなく仕様上のスコープ外、README「現在の範囲外」節に明記）: Gmail/Outlook同期のOAuth・同期処理本体、メール送信/返信、ウイルススキャン、ファイル版管理、Googleログイン、カレンダー・Slack連携、検索履歴・高度な検索条件、複数組織対応、監査ログの長期保管・エクスポート、外部エラー監視サービス連携。
+
+---
+
+## 9. テスト状況
+
+- テストランナー: Vitest（`npm test` = `vitest run`）
+- 直近の実行結果: **65 test files / 339 tests、全件成功**（上記のflaky事例を除く。フルスイートを2回連続実行してどちらも339/339成功を確認済み）
+- テスト方針: `vi.hoisted()`で共有モック状態を持つ、`vi.mock("@/lib/env", ...)`パターン、ワークフローYAMLやJSON設定ファイルは`node:fs/promises`で実ファイルを読み文字列アサーションする方式（`src/test/*.test.ts`）
+- DB側のテスト: `supabase/tests`にpgTAPテストがあり、外部キー・RLS・クライアント権限・サーバー専用テーブルを検証。CIのDBジョブはUbuntu上のローカルSupabaseに全migrationを適用して実行（リモート接続なし、秘密情報不使用）。`npm run supabase:test`で実行可能（ローカルSupabase起動が前提）。
+- CI: 通常CI（macOS/Windows/Supabaseの3ジョブ）は最新pushで全て成功（commit `beb843d`時点で確認、それ以降のcommitでも継続してCIは通っている前提だが、`619f3d3`以降のCI実行結果はこのHANDOFF.mdでは個別確認していない。**次の作業者は`gh run list --branch main --limit 5`で最新の実行結果を確認すること**）。
+
+---
+
+## 10. 環境構築や実行方法
+
+`README.md`の「必要環境」「セットアップ」「開発」「品質チェック」節が正式手順（このHANDOFF.mdでは要点のみ）。
+
+```sh
+# 前提: Node.js 22+, npm 10+, Rust stable, Tauri 2のOS別prerequisites
+npm install
+cp .env.example .env
+# .envにSupabaseのProject URLとPublishable keyを設定する
+# service_roleキーは絶対にデスクトップアプリへ設定しない
+
+# ブラウザでフロントエンドのみ起動
+npm run dev
+
+# Tauriデスクトップアプリを起動
+npm run tauri dev
+```
+
+品質チェック（`AGENTS.md`「Required checks」と同一、変更を引き渡す前に必ず実行）:
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npm run format:check
+npm run build
+npm run verify:repo
+```
+
+`src-tauri`配下を変更した場合は追加で:
+
+```sh
+npm run tauri build
+```
+
+staging独立アプリのローカルビルド確認:
+
+```sh
+npm run tauri build -- --config src-tauri/tauri.staging.conf.json
+```
+
+Supabase関連（ローカルDocker Supabaseが前提）:
+
+```sh
+npm run supabase:start
+npm run supabase:reset   # 全migrationをクリーンDBへ適用
+npm run supabase:test    # pgTAPテスト
+npm run supabase:check:local   # readiness確認
+npm run supabase:check:linked  # リンク先確認（project ref不一致で停止する設計）
+npm run supabase:stop
+```
+
+**production/staging Supabaseへの直接操作は`docs/production-release-runbook.md`の手順に厳密に従うこと。** 隔離ディレクトリ・git worktreeを使い、メインの開発リポジトリをproductionにlinkしない。`supabase`パッケージは`2.111.0`に固定（`2.112.0`は`projects list`のパース不具合あり）。
+
+---
+
+## 11. 次のAIが作業を再開するための具体的な手順
+
+1. **状況確認**（コード変更前に必ず実行）:
+   ```sh
+   git status
+   git log --oneline -10
+   gh run list --branch main --limit 5
+   ```
+   `git status`がcleanでないなら、それが誰の作業か（自分がこれから始める作業か、前回セッションの続きか）をユーザーに確認する。
+
+2. **必読ドキュメント**（優先順）:
+   - `AGENTS.md` — プロジェクトルール全体
+   - `docs/production-go-no-go-checklist.md` — 本番移行の正式な進捗表（Stage 1/2はGo、Stage 3は未判定）
+   - このファイル（`HANDOFF.md`）
+   - `docs/development-handoff-2026-08-11.md` — より詳細な時系列ログ（本ファイルの元ネタ、粒度が細かい）
+   - `README.md` — 機能の実装詳細（Phase単位）
+   - `docs/uat-checklist.md` — 業務受け入れテスト観点
+   - `docs/production-release-runbook.md` — 本番への実操作手順（実際にproductionを触る場合のみ）
+   - `docs/rollback-runbook.md` — 配布後に問題が出た場合の切り戻し手順
+
+3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。ユーザーから別の指示がなければ、**Windows実機でのstaging版UAT（S3-10）が最優先**とドキュメント上で合意されている。
+
+4. **作業前の安全確認（このプロジェクト特有のルール）**:
+   - `.env.local`・`.env`はコミット対象外であることを都度確認（`git status --ignored`で`!!`表示になっているか）
+   - production/staging Supabaseへ接続するコマンド（`supabase link`、`supabase db push`等）を実行する前に、必ず対象project refを確認する（production: `dsaqarejqslzgcatkxeh`、staging: `admjgbfrfoczpxdtxmgy`。値そのものはこの文書に書いているが、実際にコマンドへ使う前に`docs/production-release-runbook.md`の手順で二重確認すること）
+   - `supabase projects api-keys`は`--reveal`なしでもservice_role JWTを平文出力することがあるため、production/stagingどちらに対しても実行しない（過去に一度誤って実行し秘密漏洩インシデントとして扱った教訓）
+   - 秘密情報らしき値をコミット・ログ・チャットへ出力しない
+
+5. **変更を行ったら、コミット前に必ず`AGENTS.md`の「Required checks」を全て実行し、全て成功することを確認する**。
+
+6. **ユーザーへの報告時**: 何を検証し、何を検証していないかを明確に分ける（このプロジェクトでは「自動テストで確認済み」と「実機/実画面で確認済み」を厳密に区別する運用が定着している。`docs/production-go-no-go-checklist.md`の記法：☒ 済／☐／△ 一部を参照）。
+
+---
+
+## 12. 秘密情報の扱いについての注記
+
+このHANDOFF.mdにはパスワード・APIキー・接続文字列の値を一切含めていません。project ref（`dsaqarejqslzgcatkxeh`, `admjgbfrfoczpxdtxmgy`）はSupabaseダッシュボードURLの一部であり秘匿情報ではないため記載していますが、これ単体でproduction/stagingへアクセスすることはできません。stagingテストユーザー（`uat-admin`/`uat-agent`/`uat-viewer`/`uat-pending`、いずれも`@example-uat.invalid`）のパスワードは、このリポジトリのどのファイルにも記録されていません。必要な場合はプロジェクトオーナーに確認してください。
