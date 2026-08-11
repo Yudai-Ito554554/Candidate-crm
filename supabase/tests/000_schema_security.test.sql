@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(29);
+select extensions.plan(30);
 
 select extensions.ok(
   to_regclass('public.candidates') is not null,
@@ -356,19 +356,30 @@ select extensions.ok(
 select extensions.ok(
   exists (
     select 1
-    from pg_trigger
-    where tgrelid = 'auth.users'::regclass
-      and tgname = 'on_auth_user_email_updated'
-      and not tgisinternal
-      and lower(pg_get_triggerdef(oid)) like '%after update of email%'
-      and lower(pg_get_triggerdef(oid)) like '%old.email is distinct from new.email%'
-  )
-  and not has_function_privilege(
+    from pg_trigger as trigger_record
+    where trigger_record.tgrelid = 'auth.users'::regclass
+      and trigger_record.tgname = 'on_auth_user_email_updated'
+      and not trigger_record.tgisinternal
+      and trigger_record.tgqual is not null
+      and exists (
+        select 1
+        from unnest(trigger_record.tgattr::smallint[]) as trigger_column(attribute_number)
+        join pg_attribute as auth_user_column
+          on auth_user_column.attrelid = trigger_record.tgrelid
+          and auth_user_column.attnum = trigger_column.attribute_number
+        where auth_user_column.attname = 'email'
+      )
+  ),
+  'Auth email changes synchronize profiles only for email updates with a WHEN predicate'
+);
+
+select extensions.ok(
+  not has_function_privilege(
     'authenticated',
     'public.sync_profile_email_from_auth()',
     'EXECUTE'
   ),
-  'Auth email changes synchronize profiles through a non-callable trigger helper'
+  'the Auth email synchronization trigger helper is not API-callable'
 );
 
 select extensions.ok(
