@@ -47,6 +47,15 @@
 | S3-8（admin限定機能）                   | ☒ 完了   | adminで招待・チーム管理・監査ログ表示、viewerで管理機能非表示を実確認                                 |
 | S3-9（未保存離脱時のデータ保護）        | ☒ 完了   | 候補者・企業・求人の3編集フォームで離脱確認と入力内容を保持した編集継続を実確認                       |
 
+## 現在の運用・配布方針（2026-08-11決定）
+
+- Supabaseは社内試験運用中はFreeプランを継続する。Runbook 2〜3節の手動DB・Storageバックアップを継続し、外部顧客への有料提供前にProへの移行を再判定する。
+- macOS版は当面プロジェクトオーナー本人だけが使用する。Apple Developer Programによる署名・Notarizationは外部提供前まで延期する。
+- 社内の他利用者はWindowsを使用するため、次の最優先はWindows実機でのstaging版インストール・起動・終了・再起動・アンインストールUATとする。
+- Freeプランでは自動バックアップと漏洩パスワード保護が利用できず、低アクティビティ時のプロジェクト停止、標準SMTPのAuthメール送信上限がある。社内運用上の制約として扱う。
+- Windows実機を待つ間に、productionへ接続する未署名の社内検証成果物を生成する`.github/workflows/production-internal-artifacts.yml`を追加した。staging workflowとは秘密情報・成果物名・用途を分離し、40桁commit SHAと確認文字列、production project refの事前・事後検証を必須にしている。
+- 上記workflowの初回実行前に、GitHub Environment `production-internal-build`へ`PROD_VITE_SUPABASE_URL`と`PROD_VITE_SUPABASE_PUBLISHABLE_KEY`を登録する。service role keyは登録しない。
+
 ## pendingユーザー確認結果
 
 - staging（`admjgbfrfoczpxdtxmgy`）に`uat-pending@example-uat.invalid`を作成済み（ロールは自動で`pending`、変更していない）。
@@ -89,7 +98,8 @@
 ### 次回再開時にやること
 
 1. S3-3の「viewerによる編集URL直接アクセス拒否」を、Tauri実アプリ上で再現できる検証方法を決めて確認する（自動回帰テストは成功済み）。
-2. Stage 3の残項目（招待メール、AI求人取り込み例外系、重複/アーカイブ、Windows実機、署名、公証等）を優先順位順に進める。
+2. Windows実機でstaging版のインストール・起動・終了・再起動・アンインストールを確認する。
+3. Stage 3の残項目（招待メール、AI求人取り込み例外系、重複/アーカイブ、署名、公証等）は外部提供前に優先順位順で進める。
 
 ## 将来改善: ログイン情報の入力省略
 

@@ -73,6 +73,8 @@ Tauriの本番WebViewにはCSPを設定しています。標準の`*.supabase.co
 
 macOS・Windowsの社内QA成果物は、GitHub Actionsの`Desktop QA artifacts`を手動実行して生成します。macOS QA版には改変検知のためのアドホック署名を付け、`.app`とDMG内の署名をアップロード前に検証します。ダウンロードZIPは、インストーラー、`sha256-manifest.json`、日本語の`INSTALL.txt`だけを直下に置きます。アドホック署名はAppleによる本人確認やNotarizationではないため、Gatekeeperの警告をなくすものではありません。ビルドにはRepository secretsの`VITE_SUPABASE_URL`と`VITE_SUPABASE_PUBLISHABLE_KEY`が必要です。QA成果物は`VITE_APP_ENV=staging`でビルドされ、画面に`STAGING`と表示されます。一般配布前の正式署名、Notarization、インストール確認は[`docs/release-checklist.md`](docs/release-checklist.md)に従ってください。
 
+production接続の社内検証用成果物は、`Production internal desktop artifacts`を手動実行して生成します。GitHub Environment `production-internal-build`へproduction専用のURLとpublishable keyを分離して登録し、承認済みcommitの40桁SHAと確認文字列を入力します。この成果物は未署名・3日間保持・一般配布禁止です。詳細は[`docs/production-release-runbook.md`](docs/production-release-runbook.md)の11節を参照してください。
+
 ## Phase 2.5 の画面
 
 - 今日の対応を起点とするホーム
@@ -202,6 +204,12 @@ npx supabase gen types typescript --linked > src/types/database.generated.ts
 フォームはReact Hook FormとZodで検証し、空の任意項目はDB向けに`null`へ正規化します。保存成功後は候補者一覧・詳細のTanStack Queryキャッシュを更新します。取得・保存エラーは候補者情報やDB内部メッセージを露出しない日本語表示に変換します。
 
 候補者画面内のAI表示はPhase 3X以降、サーバー生成データへ移行しています。
+
+## 候補者データ取り込み
+
+`/candidates/import`では、admin・agentが候補者をCSVまたは履歴書テキストから登録できます。CSVはUTF-8とShift_JIS、最大2MB・1,000名に対応し、日本語・英語の見出しを既存候補者項目へ自動対応します。登録前に列対応、Zod入力検証、既存候補者およびCSV内の氏名・メール・電話の重複、登録対象行を確認します。一括保存は既存のSupabase RLSと監査トリガーを通り、viewerはルートガードとRLSの双方で書き込みできません。
+
+文字入りPDFはTauriのRustプロセス内で最大5MBまで文字抽出し、貼り付けテキストと同じ確認フォームへ反映します。候補者PDF、抽出原文、氏名、連絡先はOpenAIやSupabase Storageへ自動送信・保存せず、入力候補を担当者が修正して明示的に登録した項目だけを`candidates`へ保存します。画像だけのPDFとパスワード保護など文字を抽出できないPDFは対象外です。
 
 ## Phase 4B の候補者パイプライン
 

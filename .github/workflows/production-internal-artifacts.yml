@@ -1,0 +1,183 @@
+name: Production internal desktop artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Buildする承認済みcommitの40桁SHA
+        required: true
+        type: string
+      confirmation:
+        description: BUILD_PRODUCTION_INTERNAL と入力
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Unsigned production internal build (${{ matrix.platform }})
+    environment: production-internal-build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            os: macos-latest
+            apple_signing_identity: "-"
+            artifact_name: candidate-crm-production-internal-macos-unsigned
+          - platform: Windows
+            os: windows-latest
+            apple_signing_identity: ""
+            artifact_name: candidate-crm-production-internal-windows-unsigned
+
+    env:
+      VITE_APP_ENV: production
+      VITE_SUPABASE_URL: ${{ secrets.PROD_VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PROD_VITE_SUPABASE_PUBLISHABLE_KEY }}
+      EXPECTED_PRODUCTION_REF: dsaqarejqslzgcatkxeh
+      FORBIDDEN_STAGING_REF: admjgbfrfoczpxdtxmgy
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
+      BUILD_CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - name: Validate manual production build request
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$BUILD_CONFIRMATION" != "BUILD_PRODUCTION_INTERNAL" ]]; then
+            echo "Production internal build confirmation did not match." >&2
+            exit 1
+          fi
+
+          if [[ ! "$RELEASE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "release_commit must be an immutable 40-character commit SHA." >&2
+            exit 1
+          fi
+
+      - name: Checkout approved release commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_commit }}
+
+      - name: Verify checked out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          normalized_release_commit="$(printf '%s' "$RELEASE_COMMIT" | tr '[:upper:]' '[:lower:]')"
+          test "$(git rev-parse HEAD)" = "$normalized_release_commit"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify production build environment without printing secrets
+        run: >-
+          node scripts/verify-build-target.mjs
+          --expected-ref="$EXPECTED_PRODUCTION_REF"
+          --forbidden-ref="$FORBIDDEN_STAGING_REF"
+
+      - name: Verify repository
+        run: npm run verify:repo
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build production desktop installers
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
+        run: npm run tauri build
+
+      - name: Verify built frontend targets production only
+        run: >-
+          node scripts/verify-build-target.mjs
+          --expected-ref="$EXPECTED_PRODUCTION_REF"
+          --forbidden-ref="$FORBIDDEN_STAGING_REF"
+          --dist=dist
+
+      - name: Verify ad-hoc signed macOS bundles
+        if: matrix.platform == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)"
+          dmg_path="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)"
+
+          test -n "$app_path"
+          test -n "$dmg_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          mount_path="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "$mount_path" -quiet || true
+            rmdir "$mount_path" || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach "$dmg_path" -mountpoint "$mount_path" -nobrowse -readonly -quiet
+          dmg_app_path="$(find "$mount_path" -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$dmg_app_path"
+          codesign --verify --deep --strict --verbose=2 "$dmg_app_path"
+
+      - name: Generate artifact manifest
+        run: npm run artifacts:manifest
+
+      - name: Stage concise internal package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          package_path="artifacts/production-internal-package"
+          mkdir -p "$package_path"
+          cp artifacts/sha256-manifest.json "$package_path/"
+
+          if [[ "${{ matrix.platform }}" == "macOS" ]]; then
+            find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -exec cp {} "$package_path/" \;
+            cat > "$package_path/INSTALL.txt" <<'EOF'
+          Candidate CRM macOS production接続・社内検証版
+
+          この成果物はproduction環境へ接続します。承認済みの社内利用者だけが使用してください。
+          Apple Developer ID署名・Notarization前のため、外部顧客へ配布しないでください。
+          EOF
+          else
+            find src-tauri/target/release/bundle/msi -maxdepth 1 -name '*.msi' -exec cp {} "$package_path/" \;
+            find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*-setup.exe' -exec cp {} "$package_path/" \;
+            cat > "$package_path/INSTALL.txt" <<'EOF'
+          Candidate CRM Windows production接続・社内検証版
+
+          この成果物はproduction環境へ接続します。承認済みの社内利用者だけが使用してください。
+          コード署名前のため、Windowsの警告が表示される場合があります。外部顧客へ配布しないでください。
+          EOF
+          fi
+
+          test "$(find "$package_path" -maxdepth 1 -type f | wc -l)" -ge 3
+
+      - name: Upload unsigned production internal artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/production-internal-package/
+          if-no-files-found: error
+          retention-days: 3

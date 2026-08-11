@@ -913,9 +913,14 @@ production側に既にadminロールの利用者が存在するかどうかは�
 
 ## 11. アプリのproduction build
 
-**現状、production向けの署名済みビルドパイプラインは存在しません。** 既存の`.github/workflows/desktop-artifacts.yml`（Desktop QA artifacts）は、GitHub Secretsの`VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY`が**staging**を指すよう設定されており、production向けではありません（2026-08-08時点で確認済み）。
+production向けには、用途が異なる次の工程を分離する。
 
-選択肢は2つあります。判断は本番移行の責任者が行う。
+- `.github/workflows/production-internal-artifacts.yml`: productionへ接続する**未署名の社内検証用**成果物。一般配布禁止。
+- 将来構築する正式リリースworkflow: Developer ID／Windowsコード署名を行う一般配布用成果物。
+
+既存の`.github/workflows/desktop-artifacts.yml`（Desktop QA artifacts）はstaging専用であり、production向けには使用しない。
+
+選択肢は3つある。判断は本番移行の責任者が行う。
 
 ### 選択肢A: 内部スモークテスト用のローカルビルド（署名なし、限定配布不可）
 
@@ -975,21 +980,39 @@ cd /path/to/candidate-crm
 git worktree remove "$WORKTREE_DIR"
 ```
 
-### 選択肢B: 正式な署名済みリリースパイプラインの新規構築
+### 選択肢B: GitHub Actionsによる社内検証用ビルド（署名なし、一般配布禁止）
+
+`.github/workflows/production-internal-artifacts.yml`を手動実行する。このworkflowは次の条件をすべて満たさない限り停止する。
+
+- `release_commit`へ承認済みcommitの40桁SHAを入力する（branch名や短縮SHAは不可）。
+- `confirmation`へ`BUILD_PRODUCTION_INTERNAL`を正確に入力する。
+- GitHub Environment `production-internal-build`に、次のEnvironment secretsを登録する。
+  - `PROD_VITE_SUPABASE_URL`: productionのSupabase URL
+  - `PROD_VITE_SUPABASE_PUBLISHABLE_KEY`: productionのpublishable key
+- URLのproject refがproduction（`dsaqarejqslzgcatkxeh`）と完全一致し、staging ref（`admjgbfrfoczpxdtxmgy`）を含まない。
+- ビルド後の`dist/`にproduction refが存在し、staging refが存在しない。
+
+このworkflowはmacOSとWindowsを別々にビルドし、成果物名に`production-internal`と`unsigned`を含め、保持期間を3日間に限定する。秘密情報の値はログ出力しない。使用するキーは公開前提のpublishable keyだけであり、service role keyは登録しない。
+
+成果物は、productionへ接続する社内検証版である。承認済みの社内利用者だけが使用し、外部顧客へ転送・一般配布しない。WindowsではSmartScreen、macOSではGatekeeperの警告が表示される場合がある。
+
+### 選択肢C: 正式な署名済みリリースパイプラインの新規構築
 
 一般配布可能な成果物を作るには、以下が必要（すべて本Runbookの範囲外、別途承認・予算が必要）。
 
 - macOS: Apple Developer Program登録（年額）、Developer ID証明書、Notarization
 - Windows: コード署名証明書（EV推奨）
-- production向けのGitHub Secrets（`PROD_VITE_SUPABASE_URL`等、既存のstaging用と分離）とビルドworkflowの新規作成
+- 選択肢Bとは別の、署名資格情報を扱う保護された正式リリースworkflow
 
 **チェック欄**
 
 | 項目                                                                                             | 実施者 | 確認者 | 日時 |
 | ------------------------------------------------------------------------------------------------ | ------ | ------ | ---- |
-| ビルド方式の選択（A/B）                                                                          |        |        |      |
+| ビルド方式の選択（A/B/C）                                                                        |        |        |      |
 | （選択肢Aの場合）`npm ci`でのビルド実施                                                          |        |        |      |
 | （選択肢Aの場合）固定パス確認の上で`.env.local`・生成物・`node_modules`を削除し`worktree remove` |        |        |      |
+| （選択肢Bの場合）Environment secrets、40桁SHA、確認文字列を設定してworkflowを実行                |        |        |      |
+| （選択肢Bの場合）成果物名・manifest・production接続先・staging ref不在を確認                     |        |        |      |
 
 ## 12. macOS／Windows成果物の検証
 
