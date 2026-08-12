@@ -1,9 +1,9 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
-最終更新: 2026-08-11（Asia/Tokyo）
-レビュー基準HEAD: `76f789c`（`fable5-review-fixes`）／`origin/main`は`1fe0679`のまま変更なし
+最終更新: 2026-08-12（Asia/Tokyo）
+基準: `main`のFable 5承認済みBatch 1マージcommit `a6e21f2`／作業ブランチ`fable5-followups-batch2`
 
-このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Batch 1変更はレビュー用ブランチ`fable5-review-fixes`へpush済みで、`main`には未反映です。
+このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1は`main`へ反映済みで、main CI Run `31598964265`の3ジョブが成功しています。
 
 ---
 
@@ -49,7 +49,13 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 1がレビュー用ブランチで進行中。** `suspended`ロール、停止画面、Authメール同期triggerと既存不整合backfill、関連テスト・レビュー文書を実装し、GitHub ActionsのmacOS、Windows、Supabase migration/policy検証は成功済み。`main`へのマージ、staging実アカウントUAT、production適用は未実施。
+**Fable 5レビュー対応Batch 2を`fable5-followups-batch2`で実装中。** Batch 1の推奨修正R1〜R5と、内部利用向け自動バックアップを同ブランチで検証しています。
+
+- R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
+- R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
+- R5: `pending`を初回承認待ち専用とし、割当UIから除外。DB RPCは保守用に5値を維持。
+- Batch 2: `scripts/backup/`へDB/Storageバックアップ、ローテーション、launchdテンプレートを追加し、`docs/backup-runbook.md`へ設定・通知・restore drillを記載。
+- production初回バックアップ、launchd登録、初回restore drillはオーナー作業であり未実施。staging・productionへの接続や変更は行っていない。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
@@ -251,6 +257,8 @@ npm run supabase:stop
    - このファイル（`HANDOFF.md`）
    - `docs/development-handoff-2026-08-11.md` — より詳細な時系列ログ（本ファイルの元ネタ、粒度が細かい）
    - `docs/fable5-review-action-plan-2026-08-11.md` — Fable 5指摘の採否、実装順、production適用条件
+   - `docs/fable5-review-batch1-result-2026-08-12.md` — Batch 1承認結果とBatch 2設計指針
+   - `docs/backup-runbook.md` — 内部利用向け自動バックアップの設定・復元・運用手順
    - `docs/fable5-review-brief-2026-08-11.md` — Fable 5へ渡した設計・セキュリティ論点と根拠
    - `README.md` — 機能の実装詳細（Phase単位）
    - `docs/uat-checklist.md` — 業務受け入れテスト観点
