@@ -22,6 +22,20 @@ const accessHardeningMigration = readFileSync(
   ),
   "utf8",
 ).toLowerCase();
+const suspendedRoleMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260811124525_add_suspended_profile_role.sql",
+  ),
+  "utf8",
+).toLowerCase();
+const profileEmailSyncMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260811124746_sync_profile_email_from_auth.sql",
+  ),
+  "utf8",
+).toLowerCase();
 
 describe("profile role permissions migration", () => {
   it("resolves the current role without exposing profile writes", () => {
@@ -95,5 +109,45 @@ describe("profile role permissions migration", () => {
       "create or replace function public.refresh_email_thread_from_message()",
     );
     expect(accessHardeningMigration).toContain("last_message_preview is null");
+  });
+
+  it("separates suspended accounts from pending approval without weakening the role boundary", () => {
+    expect(suspendedRoleMigration).toContain(
+      "check (role in ('pending', 'suspended', 'admin', 'agent', 'viewer'))",
+    );
+    expect(suspendedRoleMigration).toContain(
+      "new_role not in ('pending', 'suspended', 'admin', 'agent', 'viewer')",
+    );
+    expect(suspendedRoleMigration).toContain(
+      "the final administrator cannot be demoted",
+    );
+    expect(suspendedRoleMigration).toContain(
+      "perform pg_advisory_xact_lock(20260806000900)",
+    );
+    expect(suspendedRoleMigration).not.toContain("create policy");
+    expect(suspendedRoleMigration).not.toContain(
+      "current_profile_role() in ('admin', 'agent', 'viewer', 'suspended')",
+    );
+  });
+
+  it("keeps the display-only profile email synchronized from Auth updates", () => {
+    expect(profileEmailSyncMigration).toContain(
+      "create or replace function public.sync_profile_email_from_auth()",
+    );
+    expect(profileEmailSyncMigration).toContain(
+      "after update of email on auth.users",
+    );
+    expect(profileEmailSyncMigration).toContain(
+      "when (old.email is distinct from new.email)",
+    );
+    expect(profileEmailSyncMigration).toContain(
+      "update public.profiles as profile",
+    );
+    expect(profileEmailSyncMigration).toContain(
+      "profile.email is distinct from auth_user.email",
+    );
+    expect(profileEmailSyncMigration).toContain(
+      "revoke all on function public.sync_profile_email_from_auth()",
+    );
   });
 });

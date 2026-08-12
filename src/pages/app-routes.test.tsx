@@ -2537,13 +2537,13 @@ describe("Candidate CRM Phase 2.5 routes", () => {
     renderRoute("/settings");
     await user.selectOptions(
       await screen.findByRole("combobox", { name: "閲覧担当のロール" }),
-      "agent",
+      "suspended",
     );
 
     await waitFor(() =>
       expect(candidateMocks.setProfileRole).toHaveBeenCalledWith(
         "user-002",
-        "agent",
+        "suspended",
       ),
     );
     expect(

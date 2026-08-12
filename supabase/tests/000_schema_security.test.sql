@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(27);
+select extensions.plan(30);
 
 select extensions.ok(
   to_regclass('public.candidates') is not null,
@@ -314,6 +314,21 @@ select extensions.ok(
 select extensions.ok(
   exists (
     select 1
+    from pg_constraint
+    where conrelid = 'public.profiles'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) like '%suspended%'
+  )
+  and position(
+    '''suspended'''
+    in lower(pg_get_functiondef('public.set_profile_role(uuid,text)'::regprocedure))
+  ) > 0,
+  'suspended is a distinct profile role that administrators can assign'
+);
+
+select extensions.ok(
+  exists (
+    select 1
     from pg_policies
     where schemaname = 'public'
       and tablename = 'candidates'
@@ -336,6 +351,35 @@ select extensions.ok(
   and not has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.handle_new_user()', 'EXECUTE'),
   'anonymous users cannot execute role helpers and trigger functions are not API-callable'
+);
+
+select extensions.ok(
+  exists (
+    select 1
+    from pg_trigger as trigger_record
+    where trigger_record.tgrelid = 'auth.users'::regclass
+      and trigger_record.tgname = 'on_auth_user_email_updated'
+      and not trigger_record.tgisinternal
+      and trigger_record.tgqual is not null
+      and exists (
+        select 1
+        from unnest(trigger_record.tgattr::smallint[]) as trigger_column(attribute_number)
+        join pg_attribute as auth_user_column
+          on auth_user_column.attrelid = trigger_record.tgrelid
+          and auth_user_column.attnum = trigger_column.attribute_number
+        where auth_user_column.attname = 'email'
+      )
+  ),
+  'Auth email changes synchronize profiles only for email updates with a WHEN predicate'
+);
+
+select extensions.ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.sync_profile_email_from_auth()',
+    'EXECUTE'
+  ),
+  'the Auth email synchronization trigger helper is not API-callable'
 );
 
 select extensions.ok(
