@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(13);
+select extensions.plan(14);
 
 create function pg_temp.set_authenticated_user(target_user_id uuid)
 returns void
@@ -210,6 +210,15 @@ select extensions.throws_ok(
   '42501',
   null,
   'a pending account remains unable to insert candidates'
+);
+
+select extensions.throws_ok(
+  $$select public.record_candidate_view(
+    '20000000-0000-0000-0000-000000000001'
+  )$$,
+  '42501',
+  'approved workspace membership required',
+  'a pending account cannot bypass RLS through record_candidate_view'
 );
 
 reset role;
