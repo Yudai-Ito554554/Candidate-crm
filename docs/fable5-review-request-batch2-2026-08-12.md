@@ -26,6 +26,8 @@ Fable 5はコードを変更しません。実装修正はCodexが行います�
 | `df2ccc6` | R3追加条件: pending SECURITY DEFINER拒否                            |
 | `f384288` | Batch 2: 自動バックアップ、ローテーション、launchd、Runbook、テスト |
 | `26f9145` | HANDOFFとaction-plan整合                                            |
+| `7a548b1` | 本レビュー依頼書                                                    |
+| `30be08f` | macOS専用実行テストと全OS共通静的安全テストを分離                   |
 
 ## 3. R1〜R5の実装結果
 
@@ -124,13 +126,28 @@ Fable 5はコードを変更しません。実装修正はCodexが行います�
 - `npm run format:check`: 成功
 - `npm run typecheck`: 成功
 - `npm run lint`: 成功
-- `npm test`: 66ファイル、346件成功
+- `npm test`: 66ファイル、347件成功
 - `npm run build`: 成功
 - `npm run verify:repo`: 成功
 - `git diff --check`: 成功
 - `bash -n`: 成功
 - `plutil -lint`: 成功
 - backup integration test: 成功、ref不一致停止、失敗ログ、14日+8週ローテーションを確認
+
+### 5.3 ブランチCI
+
+GitHub Actions Run `31645053287`（head `30be08f`）は全ジョブ成功しました。
+
+- Supabase migration and policy checks: 成功
+- Quality checks (macos-latest): 成功
+- Quality checks (windows-latest): 成功
+
+初回Run `31644509478`では、macOS専用スクリプトの実行テストがWindows上でも`/bin/bash`を直接呼び、`ENOENT`で失敗しました。`30be08f`で次の責務へ分離して解消しています。
+
+- 全OS: shebang、fail-fast設定、service role key非依存、project ref検証、完了マーカー、保持世代定数の静的検証。
+- macOS: 実スクリプトを用いたartifact作成、ref不一致fail-closed、失敗ログ、ローテーションの実行検証。
+
+バックアップ実行基盤がmacOS内部利用向けである点は変更していません。Windows CIで検証を全面的に無効化せず、OS非依存の安全契約は維持しています。
 
 ## 6. 未実施と安全上の区別
 
