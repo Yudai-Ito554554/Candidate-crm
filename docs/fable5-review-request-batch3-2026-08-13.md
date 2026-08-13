@@ -5,6 +5,11 @@
 - Implementation role: Codex
 - Branch: `fable5-rls-initplan-batch3`
 - Base: `main` at `f248410fc346ce5fac0e3d74910e6c297320dadd`
+- Implementation review HEAD: `459bbc1777495b613f8017c18bd2e3a678649fe0`
+- GitHub Actions Run ID: `31685999087`
+- GitHub Actions result: all 3 jobs passed
+- GitHub Actions URL:
+  https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31685999087
 - Production/staging operations: none
 
 ## 1. Review objective
@@ -57,10 +62,13 @@ https://supabase.com/docs/guides/database/postgres/row-level-security#call-funct
 
 - Migration-specific Vitest: 2/2 passed.
 - Format, format check, typecheck, and lint passed before the full-suite run.
-- The first full Vitest run reported five pre-existing 5-second timeout flakes
-  outside the Batch 3 files. A targeted rerun reduced these to the known global
-  search route flake and one backup-script timeout; the Batch 3 tests remained
-  green. CI must be used as the clean-run authority before approval.
+- A local single-worker full Vitest rerun passed: 67 files / 353 tests.
+- GitHub Actions Run `31685999087` verified the implementation review HEAD and
+  passed all jobs:
+  - Quality checks (`macos-latest`): passed.
+  - Quality checks (`windows-latest`): passed.
+  - Supabase migration and policy checks: passed, including clean migration
+    reapplication and database tests.
 
 ## 5. Requested review points
 
@@ -81,5 +89,6 @@ https://supabase.com/docs/guides/database/postgres/row-level-security#call-funct
 - Auth/RLS role model changes
 - Production/staging migration application
 
-After the branch is committed and pushed, Codex will append the branch HEAD and
-CI Run ID to this document for the final Fable 5 review.
+This document records the green CI run for the implementation review HEAD. The
+subsequent documentation-only commit that adds this evidence does not alter the
+implementation under review.
