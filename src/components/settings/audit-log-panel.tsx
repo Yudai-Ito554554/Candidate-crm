@@ -9,6 +9,7 @@ import { Table, TableContainer, Td, Th } from "@/components/ui/table";
 import { useAuditLogsQuery } from "@/features/settings/audit-log-queries";
 import type {
   AuditAction,
+  AuditActorKind,
   AuditEntityType,
   ProfileRow,
 } from "@/types/database";
@@ -22,6 +23,12 @@ const actionLabels: Record<AuditAction, string> = {
   reopen: "再開",
   review: "確認",
   role_change: "ロール変更",
+};
+
+const actorKindLabels: Record<AuditActorKind, string> = {
+  user: "利用者",
+  service: "サービス",
+  system: "システム",
 };
 
 const entityLabels: Record<AuditEntityType, string> = {
@@ -147,6 +154,7 @@ export function AuditLogPanel({ profiles }: AuditLogPanelProps) {
             <thead>
               <tr>
                 <Th>日時</Th>
+                <Th>経路</Th>
                 <Th>実行者</Th>
                 <Th>操作</Th>
                 <Th>対象</Th>
@@ -159,6 +167,9 @@ export function AuditLogPanel({ profiles }: AuditLogPanelProps) {
                 <tr key={log.id}>
                   <Td className="whitespace-nowrap text-xs">
                     {formatTimestamp(log.occurred_at)}
+                  </Td>
+                  <Td>
+                    <Badge value={actorKindLabels[log.actor_kind]} />
                   </Td>
                   <Td className="max-w-40 truncate text-xs">
                     {log.actor_id

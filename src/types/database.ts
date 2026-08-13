@@ -72,6 +72,7 @@ export type AuditAction =
   | "reopen"
   | "review"
   | "role_change";
+export type AuditActorKind = "user" | "service" | "system";
 export type AuditEntityType =
   | "profile"
   | "candidate"
@@ -336,6 +337,7 @@ export interface CrmSearchResultRow {
 export interface AuditLogRow {
   id: number;
   actor_id: string | null;
+  actor_kind: AuditActorKind;
   action: AuditAction;
   entity_type: AuditEntityType;
   entity_id: string;

@@ -344,6 +344,7 @@ export type Database = {
         Row: {
           action: string;
           actor_id: string | null;
+          actor_kind: string;
           changed_fields: string[];
           entity_id: string;
           entity_type: string;
@@ -354,6 +355,7 @@ export type Database = {
         Insert: {
           action: string;
           actor_id?: string | null;
+          actor_kind?: string;
           changed_fields?: string[];
           entity_id: string;
           entity_type: string;
@@ -364,6 +366,7 @@ export type Database = {
         Update: {
           action?: string;
           actor_id?: string | null;
+          actor_kind?: string;
           changed_fields?: string[];
           entity_id?: string;
           entity_type?: string;
@@ -1305,6 +1308,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      apply_invited_profile_role: {
+        Args: {
+          new_role: string;
+          requester_id: string;
+          target_user_id: string;
+        };
+        Returns: undefined;
+      };
       archive_unused_tag: {
         Args: { target_tag_id: string };
         Returns: {
