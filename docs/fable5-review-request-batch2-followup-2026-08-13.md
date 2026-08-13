@@ -72,6 +72,16 @@ Runbookの合格条件に次を追加しました。
 - 最終再実行: format / format:check / typecheck / lint / test（66ファイル・351件）/ build / verify:repo / git diff --checkがすべて成功。
 - CI結果はcommit・push後に別commitで本書へ追記します。
 
+### 4.1 GitHub Actions
+
+推奨対応commit `98e6c34ac6b4ecc92bf73dfc4cbea3345aaca7c3`に対するCI Run [`31654100178`](https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31654100178)は全ジョブ成功しました。
+
+- Quality checks (macos-latest): 成功（2m50s）
+- Quality checks (windows-latest): 成功（5m8s）
+- Supabase migration and policy checks: 成功（3m1s）
+
+本CI結果を記録するdocs-only commitについても、push後の最終CIを確認します。
+
 ## 5. 未実施・安全境界
 
 - production・stagingへの接続なし。
