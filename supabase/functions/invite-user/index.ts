@@ -117,13 +117,14 @@ Deno.serve(async (request) => {
       });
     }
 
-    const { error: roleError } = await adminClient
-      .from("profiles")
-      .update({
-        role: invite.role,
-        display_name: invite.displayName || null,
-      })
-      .eq("id", inviteData.user.id);
+    const { error: roleError } = await adminClient.rpc(
+      "apply_invited_profile_role",
+      {
+        target_user_id: inviteData.user.id,
+        new_role: invite.role,
+        requester_id: authData.user.id,
+      },
+    );
     if (roleError) {
       return jsonResponse(500, {
         error:
