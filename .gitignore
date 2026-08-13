@@ -10,6 +10,8 @@ src-tauri/target/
 .env
 .env.local
 .env.*.local
+scripts/backup/backup.env
+scripts/backup/*.local
 
 # Editors and operating systems
 .DS_Store
@@ -31,3 +33,4 @@ src-tauri/gen/
 
 # Supabase CLI local state
 supabase/.temp/
+supabase/.branches/

@@ -62,7 +62,9 @@
 - trigger helperをData APIから実行できないようREVOKEする。
 - TypeScript union、表示ラベル、UI、静的migrationテスト、pgTAPを更新する。
 
-状態: 実装・TypeScript検証完了。ローカルSupabase検証待ち。
+状態: 完了。Fable 5承認済みのBatch 1を`main`へマージし、main CIのmacOS・Windows・Supabaseの3ジョブが成功した。
+
+推奨修正R1〜R5は`fable5-followups-batch2`へ実装した。R5は「`pending`は初回承認待ち専用。UIからの降格先は`suspended`のみ。DB関数は復旧・保守経路として5値を維持」を採用した。
 
 ### Batch 2: 内部利用向け自動バックアップ
 
@@ -70,7 +72,7 @@
 - 成功・失敗通知、保持期間、暗号化、復元drill周期を定める。
 - production障害時に候補者データを復元できない現在進行形のリスクを、性能改善より先に閉じる。
 
-状態: 未着手。Batch 1のクリーンDB検証後に最優先で行う。
+状態: `fable5-followups-batch2`で実装・ローカル検証中。DB論理ダンプ、Storage `crm-files`、checksum・metadata、日次14世代+週次8世代、macOS通知+ログ、launchdテンプレート、restore drill Runbookを追加した。production初回実行、launchd登録、初回restore drillはオーナー作業として未実施。
 
 ### Batch 3: RLS性能改善
 

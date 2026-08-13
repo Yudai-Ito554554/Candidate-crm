@@ -2,7 +2,28 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(10);
+select extensions.plan(14);
+
+create function pg_temp.set_authenticated_user(target_user_id uuid)
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config(
+    'request.jwt.claim.sub',
+    target_user_id::text,
+    true
+  );
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object(
+      'sub', target_user_id::text,
+      'role', 'authenticated'
+    )::text,
+    true
+  );
+end;
+$$;
 
 insert into auth.users (
   id,
@@ -73,12 +94,16 @@ values (
   'Batch 1 access fixture'
 );
 
-set local role authenticated;
-select set_config(
-  'request.jwt.claim.sub',
-  '10000000-0000-0000-0000-000000000001',
-  true
+insert into storage.objects (bucket_id, name)
+values (
+  'crm-files',
+  '10000000-0000-0000-0000-000000000001/batch1-access-fixture.pdf'
 );
+
+select pg_temp.set_authenticated_user(
+  '10000000-0000-0000-0000-000000000001'
+);
+set local role authenticated;
 
 select extensions.throws_ok(
   $$select public.set_profile_role(
@@ -90,11 +115,11 @@ select extensions.throws_ok(
   'the final administrator cannot suspend their own account'
 );
 
-select set_config(
-  'request.jwt.claim.sub',
-  '10000000-0000-0000-0000-000000000002',
-  true
+reset role;
+select pg_temp.set_authenticated_user(
+  '10000000-0000-0000-0000-000000000002'
 );
+set local role authenticated;
 
 select extensions.is(
   (select count(*) from public.candidates),
@@ -116,6 +141,36 @@ select extensions.throws_ok(
   'a suspended account cannot insert candidates'
 );
 
+select extensions.is(
+  (
+    select count(*)
+    from storage.objects
+    where bucket_id = 'crm-files'
+  ),
+  0::bigint,
+  'a suspended account cannot read private CRM storage objects'
+);
+
+select extensions.throws_ok(
+  $$insert into storage.objects (bucket_id, name)
+    values (
+      'crm-files',
+      '10000000-0000-0000-0000-000000000002/suspended-upload.pdf'
+    )$$,
+  '42501',
+  null,
+  'a suspended account cannot upload private CRM storage objects'
+);
+
+select extensions.throws_ok(
+  $$select public.record_candidate_view(
+    '20000000-0000-0000-0000-000000000001'
+  )$$,
+  '42501',
+  'approved workspace membership required',
+  'a suspended account cannot bypass RLS through record_candidate_view'
+);
+
 update public.candidates
 set full_name = 'Suspended update must not apply'
 where id = '20000000-0000-0000-0000-000000000001';
@@ -132,13 +187,10 @@ select extensions.is(
   'a suspended account cannot update candidates'
 );
 
-set local role authenticated;
-
-select set_config(
-  'request.jwt.claim.sub',
-  '10000000-0000-0000-0000-000000000003',
-  true
+select pg_temp.set_authenticated_user(
+  '10000000-0000-0000-0000-000000000003'
 );
+set local role authenticated;
 
 select extensions.is(
   (select count(*) from public.candidates),
@@ -158,6 +210,15 @@ select extensions.throws_ok(
   '42501',
   null,
   'a pending account remains unable to insert candidates'
+);
+
+select extensions.throws_ok(
+  $$select public.record_candidate_view(
+    '20000000-0000-0000-0000-000000000001'
+  )$$,
+  '42501',
+  'approved workspace membership required',
+  'a pending account cannot bypass RLS through record_candidate_view'
 );
 
 reset role;
