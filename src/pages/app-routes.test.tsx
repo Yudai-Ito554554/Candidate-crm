@@ -589,6 +589,7 @@ describe("Candidate CRM Phase 2.5 routes", () => {
         {
           id: 1,
           actor_id: "user-001",
+          actor_kind: "user",
           action: "update",
           entity_type: "candidate",
           entity_id: "c-001",
@@ -2566,10 +2567,12 @@ describe("Candidate CRM Phase 2.5 routes", () => {
         "suspended",
       ),
     );
-    expect(
-      await screen.findByRole("table", { name: "監査ログ一覧" }),
-    ).toBeInTheDocument();
+    const auditLogTable = await screen.findByRole("table", {
+      name: "監査ログ一覧",
+    });
+    expect(auditLogTable).toBeInTheDocument();
     expect(screen.getByText("候補者ステータス、次回対応日")).toBeVisible();
+    expect(within(auditLogTable).getByText("利用者")).toBeVisible();
     expect(candidateMocks.listAuditLogs).toHaveBeenCalledWith();
   });
 

@@ -46,18 +46,20 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 10. **production接続の社内検証用ビルドパイプライン追加・実行**（commit `9cbedc5`, `d5a8fc1`）: `.github/workflows/production-internal-artifacts.yml`（新規）と`scripts/verify-build-target.mjs`（新規）。40桁commit SHAと確認文字列の入力必須、`EXPECTED_PRODUCTION_REF`/`FORBIDDEN_STAGING_REF`によるビルド前後の接続先検証、GitHub Environment `production-internal-build`経由でproduction専用secretsを分離。Run `31482456482`でmacOS・Windowsの両成果物が成功し、source commit `d5a8fc1`との一致とmacOS成果物のSHA256・ad-hoc署名を確認済み。一般配布は禁止。
 11. **Fable 5レビュー対応Batch 2の完了**（マージcommit `36e48c5`）: R1〜R5のpgTAP・運用ルール強化に加え、DB/Storageバックアップ、ローテーション、48時間のfreshness監視、launchdテンプレート、障害復旧手順を追加。Fable 5はBatch 2全体（`afbfcf8..bba0c02`）をApproveし、Blocker/High/Mediumなし。残りは共通検証libへの将来抽出、通知文言の閾値連動、freshnessのERR trapのLow 3件のみ。
 12. **Fable 5レビュー対応Batch 3の完了**（マージcommit `b4d1301`）: 51件の有効なRLS policyにある行非依存の`public.current_profile_role()`全66箇所を`(select public.current_profile_role())`へ変更し、PostgreSQL InitPlanでstatement単位に評価される形へ最適化。`USING`/`WITH CHECK`の認可真理値は維持し、カタログ完全性テストと認証済み候補者一覧の`EXPLAIN`テストを追加した。Fable 5はApprove、Blocker/High/Mediumなし。LowはpgTAP診断の分割とEXPLAINテストの保守コメントのみ。
+13. **Fable 5レビュー対応Batch 4の完了**: `audit_logs.actor_kind`で`user`/`service`/`system`を区別し、認証済み操作、検証済みrequesterを伝播するservice-only RPC、メール同期等のsystem operationを監査上判別可能にした。`store_candidate_ai_summary`と`invite-user`のactor帰属を修正し、pgTAP T1〜T6を含む14 assertionとVitest静的確認を追加。Fable 5は`8351cd5..b759c20`をApproveし、Blocker/High/Mediumなし。Lowは招待専用RPCの更新対象を`pending`へ限定する防御強化と、PUBLIC既定EXECUTEが残るトリガー関数6件の権限整理。
 
 ---
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 3の実装・レビュー・`main`マージは完了。**
+**Fable 5レビュー対応Batch 4の実装・レビューは完了し、`main`マージ作業中。**
 
 - R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
 - R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
 - R5: `pending`を初回承認待ち専用とし、割当UIから除外。DB RPCは保守用に5値を維持。
 - Batch 2: `scripts/backup/`へDB/Storageバックアップ、ローテーション、freshness監視、launchdテンプレートを追加し、`docs/backup-runbook.md`へ設定・通知・restore drillを記載。
 - Batch 3: `supabase/migrations/20260813024735_optimize_rls_role_initplan.sql`で51 policy・66箇所のロール参照をInitPlan形へ変更し、pgTAPとVitestで完全性・認可不変・実行計画を検証。Fable 5承認後に`main`へ`--no-ff`マージし、Run `31689015343`のmacOS・Windows・Supabase全ジョブが成功した。
+- Batch 4: `supabase/migrations/20260813103834_audit_actor_attribution.sql`で監査actorを`user`/`service`/`system`へ分類し、AIサマリー保存と招待時ロール設定のverified requester帰属を実装。Fable 5は`8351cd5..b759c20`をApprove（Blocker/High/Mediumなし）。Low 1件は`apply_invited_profile_role`の更新対象を`pending`へ限定し、非pending profileでは`P0002`で拒否する防御強化で、次バッチ冒頭にpgTAP 1件と合わせて対応する。
 - production初回バックアップ、launchd登録、初回restore drillはオーナー作業であり未実施。staging・productionへの接続や変更は行っていない。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
@@ -99,7 +101,8 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 4. Stage 3残項目（招待メールの実地確認、AI求人取り込み例外系のOS実機一連UAT）を優先順位順に進める。
 5. 外部提供前に: Apple Developer Program登録・署名・Notarization（C-2）、Windowsコード署名証明書（C-3）、Supabase Proプランの再判定（C-4/C-5）。
 6. バックログ（Stage 3の必須項目ではない）: ログイン情報入力省略機能。メールアドレスの安全な自動入力、パスワードはOSのKeychain/Credential Manager等の安全な資格情報保管を使う（`localStorage`使用は`AGENTS.md`のルール上不可）。詳細は`docs/development-handoff-2026-08-11.md`の「将来改善」節。
-7. **Batch 4（監査actor）**: 実装前にFable 5へmigration設計案を渡して承認を得る。actor引数RPCは`service_role`限定、system operationと人間操作を区別できる監査表現、`invite-user`のrole設定経路の帰属を設計する。認証/RLS/監査意味論の設計変更は、承認前に実装しない。
+7. **Batch 5（セッション保存）**: Supabase Auth custom storage adapter、Tauri/Rust側のOS資格情報保管、既存localStorageセッションの安全な移行・消去を、Fable 5の設計レビュー後に実装する。パスワード自体は保存しない。
+8. **Batch 4残Low**: `apply_invited_profile_role`を`pending` profile限定へ狭める防御強化をpgTAPとともに実施する。PUBLIC既定EXECUTEが残るトリガー関数6件のREVOKEは、actor意味論と分離した専用migration・権限回帰テストとして扱う。
 
 ---
 
@@ -271,7 +274,7 @@ npm run supabase:stop
    - `docs/production-release-runbook.md` — 本番への実操作手順（実際にproductionを触る場合のみ）
    - `docs/rollback-runbook.md` — 配布後に問題が出た場合の切り戻し手順
 
-3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。ユーザーから別の指示がなければ、Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。コード実装を続ける場合は**Batch 4のmigration設計案を作り、実装前にFable 5レビューを受ける**。監査意味論を承認前に変更しない。
+3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。ユーザーから別の指示がなければ、Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。コード実装を続ける場合は、まず**Batch 4残Low**を独立migrationと回帰テストで閉じるか、**Batch 5の設計書をFable 5へ依頼する**。Batch 5のTauri/Rust実装は設計承認前に開始しない。
 
 4. **作業前の安全確認（このプロジェクト特有のルール）**:
    - `.env.local`・`.env`はコミット対象外であることを都度確認（`git status --ignored`で`!!`表示になっているか）

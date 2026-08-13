@@ -28,6 +28,12 @@ describe("user invitation", () => {
     expect(functionSource).toContain('callerprofile?.role !== "admin"');
     expect(functionSource).toContain("auth.admin.inviteuserbyemail");
     expect(functionSource).toContain(
+      '.rpc(\n      "apply_invited_profile_role"',
+    );
+    expect(functionSource).not.toMatch(
+      /\.from\(["']profiles["']\)\s*\.update\(/,
+    );
+    expect(functionSource).toContain(
       'const invite_redirect_url = "candidate-crm://auth/callback"',
     );
     expect(functionSource).toContain('role !== "agent"');
