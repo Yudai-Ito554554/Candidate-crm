@@ -97,12 +97,13 @@
 - actor引数を受け取るRPCは`service_role`へのGRANTに限定し、`authenticated`へGRANTしない。authenticatedから呼べるRPCへactor引数を追加すると、クライアントが他者IDを詐称できるため。
 - `auth.uid()`がnullのsystem operationと、人間操作を区別できる監査仕様にする。
 
-状態: 未着手。設計レビュー後に実装する。
+状態: 完了。Fable 5承認済み設計に従い、`audit_logs.actor_kind`、AIサマリー保存と招待時ロール設定のverified requester帰属、system operation分類を1本のmigrationと独立した`invite-user` commitで実装した。pgTAP T1〜T6を含む14 assertionとVitest静的確認を追加し、Fable 5は`8351cd5..b759c20`の4 commitをApprove（Blocker/High/Mediumなし）。ブランチCI Run `31694194379`はmacOS・Windows・Supabase全3ジョブ成功。
 
 実装ゲート: 監査意味論に設計判断を含むため、migration設計案を実装前にFable 5へ提示する。少なくとも、actor引数RPCの`service_role`限定、メール同期trigger/backfill/将来の復元をsystem operationとして人間操作と区別する表現、`invite-user`のrole設定経路の帰属を設計書で確定する。
 
 残Low（Batch 4のマージ・production適用を妨げない独立項目）:
 
+- `apply_invited_profile_role`のUPDATE対象を`role = 'pending'`へ限定し、非pending profileへの適用は`P0002`で拒否する。Edge Functionの誤UUID指定に対する防御強化として、agent profileへの適用拒否をpgTAP 1件で固定する。
 - PUBLIC既定EXECUTEが残るトリガー関数6件を棚卸しし、直接呼出しが不要であることを確認したうえで`PUBLIC`・`anon`・`authenticated`からEXECUTEをREVOKEする。triggerとしての実行は関数EXECUTE権限に依存しないが、actor意味論とは独立した権限変更なのでBatch 4 migrationへ混在させず、専用migrationと権限回帰テストで対応する。
 
 ### Batch 5: セッション保存
