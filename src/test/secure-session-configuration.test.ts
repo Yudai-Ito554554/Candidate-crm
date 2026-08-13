@@ -22,6 +22,31 @@ describe("Batch 5 secure session configuration", () => {
     );
   });
 
+  it("Tauri identifierとRust資格情報serviceの対応を固定する", () => {
+    const productionConfig = JSON.parse(
+      readFileSync(resolve("src-tauri/tauri.conf.json"), "utf8"),
+    ) as { identifier: string };
+    const stagingConfig = JSON.parse(
+      readFileSync(resolve("src-tauri/tauri.staging.conf.json"), "utf8"),
+    ) as { identifier: string };
+    const rustSource = readFileSync(resolve("src-tauri/src/lib.rs"), "utf8");
+
+    expect(productionConfig.identifier).toBe("com.candidatecrm.desktop");
+    expect(stagingConfig.identifier).toBe("com.candidatecrm.desktop.staging");
+    expect(rustSource).toContain(
+      `"${productionConfig.identifier}" => Ok(PRODUCTION_CREDENTIAL_SERVICE)`,
+    );
+    expect(rustSource).toContain(
+      `"${stagingConfig.identifier}" => Ok(STAGING_CREDENTIAL_SERVICE)`,
+    );
+    expect(rustSource).toContain(
+      'const PRODUCTION_CREDENTIAL_SERVICE: &str = "com.candidatecrm.desktop.production";',
+    );
+    expect(rustSource).toContain(
+      'const STAGING_CREDENTIAL_SERVICE: &str = "com.candidatecrm.desktop.staging";',
+    );
+  });
+
   it("Batch 5でSupabase migrationを追加しない", () => {
     const migrations = readdirSync(resolve("supabase/migrations"));
     expect(
