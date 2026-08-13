@@ -108,6 +108,8 @@ language plpgsql security definer set search_path = ...
 | `public.validate_application_relation()`                                                                                 | PUBLIC既定（トリガー関数） | なし         | なし（`NEW`のみ変更）                | 変更不要                            |
 | `public.validate_job_contact_company()`                                                                                  | PUBLIC既定（トリガー関数） | なし         | なし（検証のみ）                     | 変更不要                            |
 
+PUBLIC既定EXECUTEの6関数は、すべてテーブルtriggerからのみ呼ばれ、requester IDを引数として受け取らない。うち`refresh_email_thread_from_message()`は監査対象テーブルを書き込むが、メール受信に伴うsystem operationとして分類することが本設計の要件であり、GUCによる人間actorの伝播対象ではない。残る5関数は検証または`NEW`の整形だけを行い、監査対象テーブルへの独立した書込み経路を持たない。したがって6関数ともBatch 4のactor帰属変更から除外する。PUBLIC EXECUTE自体の整理はactor意味論とは独立した権限縮小であるため、本migrationへ混在させずaction planのLow項目として別途扱う。
+
 `private`スキーマには、`service_role`がEXECUTE権限を持つ関数は存在しなかった。したがって、設計規則「requester_idを受け取り、かつ監査対象テーブルを書き込む関数」に該当する既存関数は`store_candidate_ai_summary`だけであり、追加される`apply_invited_profile_role`と合わせて2経路のみを変更対象とする。
 
 ### 4.3 メール同期トリガー・backfill(変更不要)

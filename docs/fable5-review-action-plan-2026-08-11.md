@@ -101,6 +101,10 @@
 
 実装ゲート: 監査意味論に設計判断を含むため、migration設計案を実装前にFable 5へ提示する。少なくとも、actor引数RPCの`service_role`限定、メール同期trigger/backfill/将来の復元をsystem operationとして人間操作と区別する表現、`invite-user`のrole設定経路の帰属を設計書で確定する。
 
+残Low（Batch 4のマージ・production適用を妨げない独立項目）:
+
+- PUBLIC既定EXECUTEが残るトリガー関数6件を棚卸しし、直接呼出しが不要であることを確認したうえで`PUBLIC`・`anon`・`authenticated`からEXECUTEをREVOKEする。triggerとしての実行は関数EXECUTE権限に依存しないが、actor意味論とは独立した権限変更なのでBatch 4 migrationへ混在させず、専用migrationと権限回帰テストで対応する。
+
 ### Batch 5: セッション保存
 
 - 現行localStorageのキーとセッション復元挙動をテスト環境で確認する。
