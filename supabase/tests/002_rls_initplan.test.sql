@@ -8,16 +8,18 @@ select extensions.ok(
   (
     select count(*) = 51
       and bool_and(
-        (
-          qual is null
-          or qual not ilike '%current_profile_role()%'
-          or qual ilike '%select current_profile_role()%'
-        )
-        and (
-          with_check is null
-          or with_check not ilike '%current_profile_role()%'
-          or with_check ilike '%select current_profile_role()%'
-        )
+        regexp_replace(
+          coalesce(qual, ''),
+          '\(\s*SELECT\s+current_profile_role\(\)(?:\s+AS\s+current_profile_role)?\s*\)',
+          '',
+          'gi'
+        ) not ilike '%current_profile_role()%'
+        and regexp_replace(
+          coalesce(with_check, ''),
+          '\(\s*SELECT\s+current_profile_role\(\)(?:\s+AS\s+current_profile_role)?\s*\)',
+          '',
+          'gi'
+        ) not ilike '%current_profile_role()%'
       )
     from pg_policies
     where coalesce(qual, '') ilike '%current_profile_role()%'
