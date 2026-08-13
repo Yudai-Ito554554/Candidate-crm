@@ -81,7 +81,12 @@
 - `USING`と`WITH CHECK`の意味を変えない。
 - suspended、pending、viewerの拒否をpgTAPで確認する。
 
-状態: 未着手。Batch 1のクリーンDB検証後に行う。
+状態: 完了。51件の有効なpolicyにある`public.current_profile_role()`全66箇所を`(select public.current_profile_role())`へ変更し、認可真理値を維持したままInitPlan化した。カタログ完全性・直接呼出し拒否・認証済み候補者一覧の`EXPLAIN`をpgTAP/Vitestで検証。Fable 5はApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`b4d1301`）、main CI Run `31689015343`のmacOS・Windows・Supabase全3ジョブ成功。
+
+残Low（マージを妨げない）:
+
+- `002_rls_initplan.test.sql`の件数/直接呼出し検査を2 assertionへ分割し、失敗診断を明確にする。
+- `003_rls_initplan_explain.test.sql`へ、PostgreSQL更新時に落ちた場合は先に`002`を確認する保守コメントを追加する。
 
 ### Batch 4: 監査actor
 
@@ -93,6 +98,8 @@
 - `auth.uid()`がnullのsystem operationと、人間操作を区別できる監査仕様にする。
 
 状態: 未着手。設計レビュー後に実装する。
+
+実装ゲート: 監査意味論に設計判断を含むため、migration設計案を実装前にFable 5へ提示する。少なくとも、actor引数RPCの`service_role`限定、メール同期trigger/backfill/将来の復元をsystem operationとして人間操作と区別する表現、`invite-user`のrole設定経路の帰属を設計書で確定する。
 
 ### Batch 5: セッション保存
 

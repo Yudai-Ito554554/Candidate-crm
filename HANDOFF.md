@@ -1,9 +1,9 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
 最終更新: 2026-08-13（Asia/Tokyo）
-基準: `main`のFable 5承認済みBatch 2マージcommit `36e48c5`
+基準: `main`のFable 5承認済みBatch 3マージcommit `b4d1301`
 
-このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1・Batch 2は`main`へ反映済みで、Batch 2マージCI Run `31660275012`の3ジョブが成功しています。
+このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1〜Batch 3は`main`へ反映済みで、Batch 3マージCI Run `31689015343`の3ジョブが成功しています。
 
 ---
 
@@ -45,17 +45,19 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 9. **候補者CSV/履歴書インポート機能の追加**（commit `619f3d3`）: `/candidates/import`ページ、CSV取り込み（UTF-8/Shift_JIS、最大2MB・1,000名、列自動対応、重複検知）、履歴書テキスト貼り付け解析、Tauri Rust側でのPDF文字抽出（最大5MB）。詳細はREADME「候補者データ取り込み」節。
 10. **production接続の社内検証用ビルドパイプライン追加・実行**（commit `9cbedc5`, `d5a8fc1`）: `.github/workflows/production-internal-artifacts.yml`（新規）と`scripts/verify-build-target.mjs`（新規）。40桁commit SHAと確認文字列の入力必須、`EXPECTED_PRODUCTION_REF`/`FORBIDDEN_STAGING_REF`によるビルド前後の接続先検証、GitHub Environment `production-internal-build`経由でproduction専用secretsを分離。Run `31482456482`でmacOS・Windowsの両成果物が成功し、source commit `d5a8fc1`との一致とmacOS成果物のSHA256・ad-hoc署名を確認済み。一般配布は禁止。
 11. **Fable 5レビュー対応Batch 2の完了**（マージcommit `36e48c5`）: R1〜R5のpgTAP・運用ルール強化に加え、DB/Storageバックアップ、ローテーション、48時間のfreshness監視、launchdテンプレート、障害復旧手順を追加。Fable 5はBatch 2全体（`afbfcf8..bba0c02`）をApproveし、Blocker/High/Mediumなし。残りは共通検証libへの将来抽出、通知文言の閾値連動、freshnessのERR trapのLow 3件のみ。
+12. **Fable 5レビュー対応Batch 3の完了**（マージcommit `b4d1301`）: 51件の有効なRLS policyにある行非依存の`public.current_profile_role()`全66箇所を`(select public.current_profile_role())`へ変更し、PostgreSQL InitPlanでstatement単位に評価される形へ最適化。`USING`/`WITH CHECK`の認可真理値は維持し、カタログ完全性テストと認証済み候補者一覧の`EXPLAIN`テストを追加した。Fable 5はApprove、Blocker/High/Mediumなし。LowはpgTAP診断の分割とEXPLAINテストの保守コメントのみ。
 
 ---
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 2の実装・レビュー・`main`マージは完了。**
+**Fable 5レビュー対応Batch 3の実装・レビュー・`main`マージは完了。**
 
 - R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
 - R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
 - R5: `pending`を初回承認待ち専用とし、割当UIから除外。DB RPCは保守用に5値を維持。
 - Batch 2: `scripts/backup/`へDB/Storageバックアップ、ローテーション、freshness監視、launchdテンプレートを追加し、`docs/backup-runbook.md`へ設定・通知・restore drillを記載。
+- Batch 3: `supabase/migrations/20260813024735_optimize_rls_role_initplan.sql`で51 policy・66箇所のロール参照をInitPlan形へ変更し、pgTAPとVitestで完全性・認可不変・実行計画を検証。Fable 5承認後に`main`へ`--no-ff`マージし、Run `31689015343`のmacOS・Windows・Supabase全ジョブが成功した。
 - production初回バックアップ、launchd登録、初回restore drillはオーナー作業であり未実施。staging・productionへの接続や変更は行っていない。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
@@ -97,6 +99,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 4. Stage 3残項目（招待メールの実地確認、AI求人取り込み例外系のOS実機一連UAT）を優先順位順に進める。
 5. 外部提供前に: Apple Developer Program登録・署名・Notarization（C-2）、Windowsコード署名証明書（C-3）、Supabase Proプランの再判定（C-4/C-5）。
 6. バックログ（Stage 3の必須項目ではない）: ログイン情報入力省略機能。メールアドレスの安全な自動入力、パスワードはOSのKeychain/Credential Manager等の安全な資格情報保管を使う（`localStorage`使用は`AGENTS.md`のルール上不可）。詳細は`docs/development-handoff-2026-08-11.md`の「将来改善」節。
+7. **Batch 4（監査actor）**: 実装前にFable 5へmigration設計案を渡して承認を得る。actor引数RPCは`service_role`限定、system operationと人間操作を区別できる監査表現、`invite-user`のrole設定経路の帰属を設計する。認証/RLS/監査意味論の設計変更は、承認前に実装しない。
 
 ---
 
@@ -177,10 +180,10 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 ## 9. テスト状況
 
 - テストランナー: Vitest（`npm test` = `vitest run`）
-- 直近の実行結果: **66 test files / 351 tests、全件成功**。全体検索テストには過去のflaky報告が残るため、`docs/fable5-review-action-plan-2026-08-11.md`のM4として独立対応する。
+- 直近のローカル単一worker実行結果: **67 test files / 353 tests、全件成功**。全体検索テストには過去のflaky報告が残るため、`docs/fable5-review-action-plan-2026-08-11.md`のM4として独立対応する。
 - テスト方針: `vi.hoisted()`で共有モック状態を持つ、`vi.mock("@/lib/env", ...)`パターン、ワークフローYAMLやJSON設定ファイルは`node:fs/promises`で実ファイルを読み文字列アサーションする方式（`src/test/*.test.ts`）
 - DB側のテスト: `supabase/tests`にpgTAPテストがあり、外部キー・RLS・クライアント権限・サーバー専用テーブルを検証。CIのDBジョブはUbuntu上のローカルSupabaseに全migrationを適用して実行（リモート接続なし、秘密情報不使用）。`npm run supabase:test`で実行可能（ローカルSupabase起動が前提）。
-- CI: Batch 2実装HEAD `98e6c34`のRun `31654100178`、Fable 5レビュー依頼追記HEAD `bba0c02`のRun `31654584041`、`main`マージHEAD `36e48c5`のRun `31660275012`は、いずれもmacOS、Windows、Supabase migration/policy checksの全3ジョブ成功。
+- CI: Batch 3実装HEAD `459bbc1`のRun `31685999087`と、`main`マージHEAD `b4d1301`のRun `31689015343`は、いずれもmacOS、Windows、Supabase migration/policy checksの全3ジョブ成功。後者では全migrationのクリーンDB再適用とpgTAP 4ファイル/46 assertionsも成功した。
 
 ---
 
@@ -259,6 +262,8 @@ npm run supabase:stop
    - `docs/development-handoff-2026-08-11.md` — より詳細な時系列ログ（本ファイルの元ネタ、粒度が細かい）
    - `docs/fable5-review-action-plan-2026-08-11.md` — Fable 5指摘の採否、実装順、production適用条件
    - `docs/fable5-review-batch1-result-2026-08-12.md` — Batch 1承認結果とBatch 2設計指針
+   - `docs/fable5-review-request-batch3-2026-08-13.md` — Batch 3の実装範囲、検証HEAD、CI証跡、Fable 5レビュー論点
+   - `docs/rls-initplan-policy-inventory-2026-08-13.md` — Batch 3で変更した51 policy・66箇所の棚卸し
    - `docs/backup-runbook.md` — 内部利用向け自動バックアップの設定・復元・運用手順
    - `docs/fable5-review-brief-2026-08-11.md` — Fable 5へ渡した設計・セキュリティ論点と根拠
    - `README.md` — 機能の実装詳細（Phase単位）
@@ -266,7 +271,7 @@ npm run supabase:stop
    - `docs/production-release-runbook.md` — 本番への実操作手順（実際にproductionを触る場合のみ）
    - `docs/rollback-runbook.md` — 配布後に問題が出た場合の切り戻し手順
 
-3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。ユーザーから別の指示がなければ、**Windows実機でのstaging版UAT（S3-10）が最優先**とドキュメント上で合意されている。
+3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。ユーザーから別の指示がなければ、Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。コード実装を続ける場合は**Batch 4のmigration設計案を作り、実装前にFable 5レビューを受ける**。監査意味論を承認前に変更しない。
 
 4. **作業前の安全確認（このプロジェクト特有のルール）**:
    - `.env.local`・`.env`はコミット対象外であることを都度確認（`git status --ignored`で`!!`表示になっているか）
