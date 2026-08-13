@@ -1,9 +1,9 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
-最終更新: 2026-08-12（Asia/Tokyo）
-基準: `main`のFable 5承認済みBatch 1マージcommit `a6e21f2`／作業ブランチ`fable5-followups-batch2`
+最終更新: 2026-08-13（Asia/Tokyo）
+基準: `main`のFable 5承認済みBatch 2マージcommit `36e48c5`
 
-このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1は`main`へ反映済みで、main CI Run `31598964265`の3ジョブが成功しています。
+このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1・Batch 2は`main`へ反映済みで、Batch 2マージCI Run `31660275012`の3ジョブが成功しています。
 
 ---
 
@@ -44,17 +44,18 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 8. **staging role UAT の実施**（commit `333ab18`, `d7f827f`）: 最新staging独立アプリでadmin/agent/viewer/pendingの実ログインを行い、権限UI非表示・データ保護UI（未保存離脱確認等）を確認。`docs/production-go-no-go-checklist.md`のStage 3項目S3-2, S3-4, S3-8, S3-9を完了に更新。
 9. **候補者CSV/履歴書インポート機能の追加**（commit `619f3d3`）: `/candidates/import`ページ、CSV取り込み（UTF-8/Shift_JIS、最大2MB・1,000名、列自動対応、重複検知）、履歴書テキスト貼り付け解析、Tauri Rust側でのPDF文字抽出（最大5MB）。詳細はREADME「候補者データ取り込み」節。
 10. **production接続の社内検証用ビルドパイプライン追加・実行**（commit `9cbedc5`, `d5a8fc1`）: `.github/workflows/production-internal-artifacts.yml`（新規）と`scripts/verify-build-target.mjs`（新規）。40桁commit SHAと確認文字列の入力必須、`EXPECTED_PRODUCTION_REF`/`FORBIDDEN_STAGING_REF`によるビルド前後の接続先検証、GitHub Environment `production-internal-build`経由でproduction専用secretsを分離。Run `31482456482`でmacOS・Windowsの両成果物が成功し、source commit `d5a8fc1`との一致とmacOS成果物のSHA256・ad-hoc署名を確認済み。一般配布は禁止。
+11. **Fable 5レビュー対応Batch 2の完了**（マージcommit `36e48c5`）: R1〜R5のpgTAP・運用ルール強化に加え、DB/Storageバックアップ、ローテーション、48時間のfreshness監視、launchdテンプレート、障害復旧手順を追加。Fable 5はBatch 2全体（`afbfcf8..bba0c02`）をApproveし、Blocker/High/Mediumなし。残りは共通検証libへの将来抽出、通知文言の閾値連動、freshnessのERR trapのLow 3件のみ。
 
 ---
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 2を`fable5-followups-batch2`で実装中。** Batch 1の推奨修正R1〜R5と、内部利用向け自動バックアップを同ブランチで検証しています。
+**Fable 5レビュー対応Batch 2の実装・レビュー・`main`マージは完了。**
 
 - R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
 - R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
 - R5: `pending`を初回承認待ち専用とし、割当UIから除外。DB RPCは保守用に5値を維持。
-- Batch 2: `scripts/backup/`へDB/Storageバックアップ、ローテーション、launchdテンプレートを追加し、`docs/backup-runbook.md`へ設定・通知・restore drillを記載。
+- Batch 2: `scripts/backup/`へDB/Storageバックアップ、ローテーション、freshness監視、launchdテンプレートを追加し、`docs/backup-runbook.md`へ設定・通知・restore drillを記載。
 - production初回バックアップ、launchd登録、初回restore drillはオーナー作業であり未実施。staging・productionへの接続や変更は行っていない。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
@@ -176,10 +177,10 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 ## 9. テスト状況
 
 - テストランナー: Vitest（`npm test` = `vitest run`）
-- 直近の実行結果: **65 test files / 342 tests、全件成功**。全体検索テストには過去のflaky報告が残るため、`docs/fable5-review-action-plan-2026-08-11.md`のM4として独立対応する。
+- 直近の実行結果: **66 test files / 351 tests、全件成功**。全体検索テストには過去のflaky報告が残るため、`docs/fable5-review-action-plan-2026-08-11.md`のM4として独立対応する。
 - テスト方針: `vi.hoisted()`で共有モック状態を持つ、`vi.mock("@/lib/env", ...)`パターン、ワークフローYAMLやJSON設定ファイルは`node:fs/promises`で実ファイルを読み文字列アサーションする方式（`src/test/*.test.ts`）
 - DB側のテスト: `supabase/tests`にpgTAPテストがあり、外部キー・RLS・クライアント権限・サーバー専用テーブルを検証。CIのDBジョブはUbuntu上のローカルSupabaseに全migrationを適用して実行（リモート接続なし、秘密情報不使用）。`npm run supabase:test`で実行可能（ローカルSupabase起動が前提）。
-- CI: `fable5-review-fixes`のRun `31509690820`はmacOS、Windows、Supabase migration/policy checksの全3ジョブ成功。`main`は`1fe0679`のままで、Batch 1は未マージ。
+- CI: Batch 2実装HEAD `98e6c34`のRun `31654100178`、Fable 5レビュー依頼追記HEAD `bba0c02`のRun `31654584041`、`main`マージHEAD `36e48c5`のRun `31660275012`は、いずれもmacOS、Windows、Supabase migration/policy checksの全3ジョブ成功。
 
 ---
 
