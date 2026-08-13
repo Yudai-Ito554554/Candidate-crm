@@ -22,6 +22,12 @@ const authMocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   unsubscribe: vi.fn(),
 }));
+const secureSessionMocks = vi.hoisted(() => ({
+  bootstrapSecureSession: vi.fn(),
+  deleteStoredRefreshToken: vi.fn(),
+  persistAuthStateChange: vi.fn(),
+  setStoredRefreshToken: vi.fn(),
+}));
 
 const candidateMocks = vi.hoisted(() => ({
   listCandidates: vi.fn(),
@@ -114,6 +120,8 @@ vi.mock("@/lib/env", () => ({
 vi.mock("@/lib/supabase", () => ({
   getSupabaseClient: vi.fn(() => Promise.resolve({ auth: authMocks })),
 }));
+
+vi.mock("@/features/auth/secure-session", () => secureSessionMocks);
 
 vi.mock("@/services/candidates-repository", () => ({
   listCandidates: candidateMocks.listCandidates,
@@ -539,6 +547,12 @@ describe("Candidate CRM Phase 2.5 routes", () => {
       data: { session: authenticatedSession },
       error: null,
     });
+    secureSessionMocks.bootstrapSecureSession.mockResolvedValue(
+      authenticatedSession,
+    );
+    secureSessionMocks.deleteStoredRefreshToken.mockResolvedValue(undefined);
+    secureSessionMocks.persistAuthStateChange.mockResolvedValue(undefined);
+    secureSessionMocks.setStoredRefreshToken.mockResolvedValue(undefined);
     authMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: authMocks.unsubscribe } },
     });

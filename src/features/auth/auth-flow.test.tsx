@@ -18,6 +18,12 @@ const authMocks = vi.hoisted(() => ({
 const profileMocks = vi.hoisted(() => ({
   listProfiles: vi.fn(),
 }));
+const secureSessionMocks = vi.hoisted(() => ({
+  bootstrapSecureSession: vi.fn(),
+  deleteStoredRefreshToken: vi.fn(),
+  persistAuthStateChange: vi.fn(),
+  setStoredRefreshToken: vi.fn(),
+}));
 
 vi.mock("@/lib/env", () => ({
   environment: {
@@ -32,6 +38,8 @@ vi.mock("@/lib/env", () => ({
 vi.mock("@/lib/supabase", () => ({
   getSupabaseClient: vi.fn(() => Promise.resolve({ auth: authMocks })),
 }));
+
+vi.mock("@/features/auth/secure-session", () => secureSessionMocks);
 
 vi.mock("@/services/profiles-repository", () => ({
   listProfiles: profileMocks.listProfiles,
@@ -73,6 +81,10 @@ describe("Supabase authentication flow", () => {
       data: { session: null },
       error: null,
     });
+    secureSessionMocks.bootstrapSecureSession.mockResolvedValue(null);
+    secureSessionMocks.deleteStoredRefreshToken.mockResolvedValue(undefined);
+    secureSessionMocks.persistAuthStateChange.mockResolvedValue(undefined);
+    secureSessionMocks.setStoredRefreshToken.mockResolvedValue(undefined);
     authMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: authMocks.unsubscribe } },
     });
@@ -108,10 +120,9 @@ describe("Supabase authentication flow", () => {
   });
 
   it("復元したセッションでCRMホームを表示する", async () => {
-    authMocks.getSession.mockResolvedValue({
-      data: { session: authenticatedSession },
-      error: null,
-    });
+    secureSessionMocks.bootstrapSecureSession.mockResolvedValue(
+      authenticatedSession,
+    );
 
     renderRoute("/");
 
@@ -169,10 +180,9 @@ describe("Supabase authentication flow", () => {
   });
 
   it("ログアウト後にログインへ戻りQueryキャッシュを破棄する", async () => {
-    authMocks.getSession.mockResolvedValue({
-      data: { session: authenticatedSession },
-      error: null,
-    });
+    secureSessionMocks.bootstrapSecureSession.mockResolvedValue(
+      authenticatedSession,
+    );
     const queryClient = new QueryClient();
     queryClient.setQueryData(["candidate", "c-001"], { name: "テスト候補者" });
     const clearSpy = vi.spyOn(queryClient, "clear");
