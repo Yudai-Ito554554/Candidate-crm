@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "Default permissions for the Candidate CRM window",
   "windows": ["main"],
-  "permissions": ["core:default", "deep-link:default"]
+  "permissions": [
+    "core:default",
+    "deep-link:default",
+    "allow-extract-candidate-pdf-text",
+    "allow-secure-credential-set",
+    "allow-secure-credential-get",
+    "allow-secure-credential-delete"
+  ]
 }
