@@ -4,7 +4,8 @@
 # only from the owner-managed config file outside the repository.
 set -Eeuo pipefail
 
-SCRIPT_VERSION=1
+# Increment this value whenever backup output semantics or metadata change.
+SCRIPT_VERSION=2
 CONFIG_POINTER_DEFAULT="$HOME/.config/candidate-crm/backup-config-path"
 CONFIG_POINTER=${CANDIDATE_CRM_BACKUP_CONFIG_POINTER:-$CONFIG_POINTER_DEFAULT}
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
@@ -20,7 +21,7 @@ notify_failure() {
   else
     printf 'Candidate CRM backup failed: %s\n' "$message" >&2
   fi
-  if command -v osascript >/dev/null 2>&1; then
+  if [[ ${CANDIDATE_CRM_BACKUP_DISABLE_NOTIFICATIONS:-0} != 1 ]] && command -v osascript >/dev/null 2>&1; then
     osascript -e 'display notification "ログを確認してください" with title "Candidate CRMバックアップ失敗"' >/dev/null 2>&1 || true
   fi
 }
@@ -94,10 +95,10 @@ LOCK_ACQUIRED=true
 
 extract_ref_from_db_url() {
   local value=$1
-  if [[ $value =~ db\.([a-z0-9]+)\.supabase\.co ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-  elif [[ $value =~ postgres\.([a-z0-9]+):[^@]+@ ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
+  if [[ $value =~ ^postgres(ql)?://[^@]*@db\.([a-z0-9]+)\.supabase\.co([:/].*)?$ ]]; then
+    printf '%s' "${BASH_REMATCH[2]}"
+  elif [[ $value =~ ^postgres(ql)?://postgres\.([a-z0-9]+):[^@]+@[^/]+(/.*)?$ ]]; then
+    printf '%s' "${BASH_REMATCH[2]}"
   else
     return 1
   fi
@@ -136,6 +137,8 @@ run_supabase() {
 
 run_supabase db dump "${DB_TARGET[@]}" --role-only --file "$INCOMPLETE_DIR/db/roles.sql"
 run_supabase db dump "${DB_TARGET[@]}" --file "$INCOMPLETE_DIR/db/schema.sql"
+# Supabase's official backup/restore guidance excludes these vector-index
+# internals; their contents are regenerated instead of restored as table data.
 run_supabase db dump "${DB_TARGET[@]}" --data-only --use-copy \
   --exclude storage.buckets_vectors --exclude storage.vector_indexes \
   --file "$INCOMPLETE_DIR/db/data.sql"
@@ -144,6 +147,7 @@ for dump_file in roles.sql schema.sql data.sql; do
   [[ -s "$INCOMPLETE_DIR/db/$dump_file" ]] || fail "$dump_file is empty"
 done
 
+mkdir -p "$INCOMPLETE_DIR/storage/crm-files"
 run_supabase storage cp --recursive "${STORAGE_TARGET[@]}" \
   ss:///crm-files "$INCOMPLETE_DIR/storage"
 

@@ -1,6 +1,6 @@
 # Candidate CRM 自動バックアップRunbook
 
-最終更新: 2026-08-12
+最終更新: 2026-08-13
 
 対象: オーナーMacで稼働するCandidate CRM内部利用版
 
@@ -50,7 +50,7 @@ production初回実行はオーナーが次の順で行います。
 - `metadata.json`のproject ref、件数、サイズが想定対象を示す。DB URLやパスワードが含まれない。
 - `shasum -a 256 -c checksums.sha256`をスナップショット内で実行して成功する。
 
-## 5. launchd日次登録
+## 5. launchd日次登録と欠測監視
 
 `scripts/backup/com.candidatecrm.backup.plist.template`を作業用コピーへ置き、次のプレースホルダーをオーナー環境の絶対パスへ置換します。
 
@@ -70,6 +70,26 @@ launchctl print "gui/$(id -u)/com.candidatecrm.backup"
 
 失敗時は`backup.log`とlaunchdの標準エラーへ記録し、macOS通知も表示します。通知権限がない場合もログと非0終了は維持されます。
 
+### 5.1 48時間のfreshness監視
+
+バックアップ処理自体が起動しない「無音の欠測」を検知するため、`scripts/backup/com.candidatecrm.backup-freshness.plist.template`も作業用コピーへ置き、次を置換します。
+
+- `__FRESHNESS_SCRIPT__`
+- `__CONFIG_POINTER__`
+- `__FRESHNESS_STDOUT_LOG__`
+- `__FRESHNESS_STDERR_LOG__`
+
+生成したplistを`$HOME/Library/LaunchAgents/com.candidatecrm.backup-freshness.plist`へ配置します。ログイン時と毎日9時に`check-backup-freshness.sh`が起動し、48時間以内の`.backup-complete`がなければ`backup.log`へ`FRESHNESS_ERROR`を記録してmacOS通知を表示します。成功時は`FRESHNESS_OK`だけをログへ残し、通知しません。
+
+```sh
+plutil -lint "$HOME/Library/LaunchAgents/com.candidatecrm.backup-freshness.plist"
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.candidatecrm.backup-freshness.plist"
+launchctl kickstart -k "gui/$(id -u)/com.candidatecrm.backup-freshness"
+launchctl print "gui/$(id -u)/com.candidatecrm.backup-freshness"
+```
+
+登録前または監視停止中は、最低でも週1回、最新snapshotの日時と`.backup-complete`を手動確認します。
+
 ## 6. ローテーション仕様
 
 - 最新の日次14世代を保持します。
@@ -88,6 +108,16 @@ launchctl print "gui/$(id -u)/com.candidatecrm.backup"
 
 productionの正しい接続情報を意図的に壊して試験しません。
 
+### 7.1 stale lockと不完全snapshotの復旧
+
+電源断や強制終了後に`.backup-lock`や`.incomplete-*`が残った場合は、次の順序を厳守します。
+
+1. `launchctl print "gui/$(id -u)/com.candidatecrm.backup"`と`pgrep -fl 'backup-crm.sh'`でバックアップ処理が実行中でないことを確認します。判定できない場合は何も削除しません。
+2. 設定ファイルを安全なローカルシェルで読み込み、`BACKUP_ROOT`が想定の専用ディレクトリであることを目視確認します。値はチャットやログへ貼りません。
+3. 実行中プロセスがない場合だけ、空ディレクトリである`.backup-lock`を`rmdir "$BACKUP_ROOT/.backup-lock"`で除去します。`rm -rf`は使いません。
+4. `snapshots/.incomplete-*`は自動削除しません。`backup.log`とlaunchd標準エラーで原因を確認し、専用の`recovery-hold`ディレクトリへ個別に移動します。復旧判断後も広範囲の再帰削除は行いません。
+5. 手動バックアップを再実行し、`SUCCESS`、checksum、metadataを再確認します。
+
 ## 8. 分離環境でのrestore drill
 
 初回drillと定期drillは`docs/production-release-runbook.md`の復元手順を使用します。
@@ -96,6 +126,9 @@ productionの正しい接続情報を意図的に壊して試験しません。
 - DBは`roles.sql`→`schema.sql`→`data.sql`の順に単一トランザクションで復元します。
 - Storageは同じ分離環境の`crm-files`へ復元します。
 - `checksums.sha256`、DB/Storage件数、合計サイズ、主要参照機能を照合します。
+- `auth.users`が復元され、`profiles`と`candidates`の行数が取得時点の期待値と一致することを確認します。
+- 復元先の`storage.objects`で`bucket_id = 'crm-files'`の件数が`metadata.json`の`storage.fileCount`と一致することを確認します。
+- 復元先アプリで候補者一覧、候補者詳細、ファイル一覧が参照できることを確認します。
 - production refとの不一致を破壊的コマンド直前に再確認します。
 - 実施日、対象snapshot、結果、実施者を共有範囲を限定した運用記録へ残します。秘密や実パスは記録しません。
 
@@ -109,4 +142,7 @@ productionの正しい接続情報を意図的に壊して試験しません。
 | DB・Storage・checksum・metadataを確認 | 未実施 |
 | 失敗通知を実機で確認                  | 未実施 |
 | launchdを登録して翌日実行を確認       | 未実施 |
+| freshness監視を登録して動作確認       | 未実施 |
+| 週次で最新の完了snapshotを確認        | 未実施 |
+| stale lock・不完全snapshot復旧を確認  | 未実施 |
 | 分離環境への初回restore drill成功     | 未実施 |
