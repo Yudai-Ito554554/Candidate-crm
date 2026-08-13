@@ -109,7 +109,13 @@
 - ウィンドウを1280×800にしてもページ全体に横スクロールが出ない
 - サイドバーの折り畳み、キーボード操作、フォーカス表示が動作する
 - macOSで起動、終了、再起動、ディープリンクを確認する
+- macOSでログイン後に終了・再起動しても再ログイン不要で、Keychainにrefresh tokenだけが保存される
+- macOSでログアウトするとKeychainの`supabase-refresh-token`エントリが削除される
+- 旧版localStorageセッションから初回移行後、該当する`sb-<project-ref>-auth-token`キーが残らない
+- Keychainアクセスを拒否してもクラッシュせず、平文保存へフォールバックしない
+- staging版とproduction版を共存させ、資格情報とログイン状態が混在しない
 - Windowsでインストール、起動、終了、再起動、アンインストールを確認する
+- Windows実機入手後、Credential Managerでログイン復元・ログアウト削除・staging/production分離を確認する（Batch 5のmainマージ条件外）
 - 未署名QA版であることをテスターへ明示し、一般配布しない
 
 ## 8. 合格条件

@@ -114,7 +114,7 @@
 - 移行時に既存セッションを安全に消去または移送する。
 - パスワード自体は保存しない。
 
-状態: 未着手。Tauri/Rust変更を伴う独立Phaseとする。
+状態: `fable5-session-keychain-batch5`で実装済み、Fable 5レビュー待ち。Fable 5設計の案Aを採用し、refresh tokenだけをOS資格情報ストアへ保存する。パスワード保存・localStorageフォールバック・DB migrationは追加していない。
 
 ### Batch 6: 外部提供基盤
 

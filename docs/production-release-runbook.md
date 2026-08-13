@@ -998,6 +998,8 @@ git worktree remove "$WORKTREE_DIR"
 
 ### 選択肢B: GitHub Actionsによる社内検証用ビルド（署名なし、一般配布禁止）
 
+未署名またはad-hoc署名のmacOS内部版では、再ビルドでコード署名が変わるとKeychainアクセス許可が再表示される場合がある。内部利用では許可操作を受容し、Developer ID署名・Notarization導入後に解消する。
+
 `.github/workflows/production-internal-artifacts.yml`を手動実行する。このworkflowは次の条件をすべて満たさない限り停止する。
 
 - `release_commit`へ承認済みcommitの40桁SHAを入力する（branch名や短縮SHAは不可）。
