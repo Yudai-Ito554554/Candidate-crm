@@ -97,7 +97,7 @@
 - actor引数を受け取るRPCは`service_role`へのGRANTに限定し、`authenticated`へGRANTしない。authenticatedから呼べるRPCへactor引数を追加すると、クライアントが他者IDを詐称できるため。
 - `auth.uid()`がnullのsystem operationと、人間操作を区別できる監査仕様にする。
 
-状態: 完了。Fable 5承認済み設計に従い、`audit_logs.actor_kind`、AIサマリー保存と招待時ロール設定のverified requester帰属、system operation分類を1本のmigrationと独立した`invite-user` commitで実装した。pgTAP T1〜T6を含む14 assertionとVitest静的確認を追加し、Fable 5は`8351cd5..b759c20`の4 commitをApprove（Blocker/High/Mediumなし）。ブランチCI Run `31694194379`はmacOS・Windows・Supabase全3ジョブ成功。
+状態: 完了。Fable 5承認済み設計に従い、`audit_logs.actor_kind`、AIサマリー保存と招待時ロール設定のverified requester帰属、system operation分類を1本のmigrationと独立した`invite-user` commitで実装した。pgTAP T1〜T6を含む14 assertionとVitest静的確認を追加し、Fable 5は`8351cd5..b759c20`の4 commitをApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`03cde05`）。ブランチCI Run `31694194379`とmainマージCI Run `31695344851`は、いずれもmacOS・Windows・Supabase全3ジョブ成功。
 
 実装ゲート: 監査意味論に設計判断を含むため、migration設計案を実装前にFable 5へ提示する。少なくとも、actor引数RPCの`service_role`限定、メール同期trigger/backfill/将来の復元をsystem operationとして人間操作と区別する表現、`invite-user`のrole設定経路の帰属を設計書で確定する。
 
