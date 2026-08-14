@@ -79,7 +79,7 @@ launchctl print "gui/$(id -u)/com.candidatecrm.backup"
 - `__FRESHNESS_STDOUT_LOG__`
 - `__FRESHNESS_STDERR_LOG__`
 
-生成したplistを`$HOME/Library/LaunchAgents/com.candidatecrm.backup-freshness.plist`へ配置します。ログイン時と毎日9時に`check-backup-freshness.sh`が起動し、48時間以内の`.backup-complete`がなければ`backup.log`へ`FRESHNESS_ERROR`を記録してmacOS通知を表示します。成功時は`FRESHNESS_OK`だけをログへ残し、通知しません。
+生成したplistを`$HOME/Library/LaunchAgents/com.candidatecrm.backup-freshness.plist`へ配置します。ログイン時と毎日9時に`check-backup-freshness.sh`が起動し、設定した許容時間（既定48時間）以内の`.backup-complete`がなければ`backup.log`へ`FRESHNESS_ERROR`を記録してmacOS通知を表示します。通知文言は実際の閾値を日・時間・秒の順で読みやすく表示します。成功時は`FRESHNESS_OK`だけをログへ残し、通知しません。
 
 ```sh
 plutil -lint "$HOME/Library/LaunchAgents/com.candidatecrm.backup-freshness.plist"

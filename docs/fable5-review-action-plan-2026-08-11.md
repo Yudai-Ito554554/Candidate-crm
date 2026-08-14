@@ -83,10 +83,10 @@
 
 状態: 完了。51件の有効なpolicyにある`public.current_profile_role()`全66箇所を`(select public.current_profile_role())`へ変更し、認可真理値を維持したままInitPlan化した。カタログ完全性・直接呼出し拒否・認証済み候補者一覧の`EXPLAIN`をpgTAP/Vitestで検証。Fable 5はApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`b4d1301`）、main CI Run `31689015343`のmacOS・Windows・Supabase全3ジョブ成功。
 
-残Low（マージを妨げない）:
+残Low（レビュー用ブランチで実装・CI検証済み）:
 
-- `002_rls_initplan.test.sql`の件数/直接呼出し検査を2 assertionへ分割し、失敗診断を明確にする。
-- `003_rls_initplan_explain.test.sql`へ、PostgreSQL更新時に落ちた場合は先に`002`を確認する保守コメントを追加する。
+- `002_rls_initplan.test.sql`の件数/直接呼出し検査を2 assertionへ分割し、失敗診断を明確化した（`40b3289`）。
+- `003_rls_initplan_explain.test.sql`へ、PostgreSQL更新時に落ちた場合は先に`002`を確認する保守コメントを追加した（`40b3289`）。
 
 ### Batch 4: 監査actor
 
@@ -101,10 +101,10 @@
 
 実装ゲート: 監査意味論に設計判断を含むため、migration設計案を実装前にFable 5へ提示する。少なくとも、actor引数RPCの`service_role`限定、メール同期trigger/backfill/将来の復元をsystem operationとして人間操作と区別する表現、`invite-user`のrole設定経路の帰属を設計書で確定する。
 
-残Low（Batch 4のマージ・production適用を妨げない独立項目）:
+残Low（独立migrationとしてレビュー用ブランチで実装・CI検証済み）:
 
-- `apply_invited_profile_role`のUPDATE対象を`role = 'pending'`へ限定し、非pending profileへの適用は`P0002`で拒否する。Edge Functionの誤UUID指定に対する防御強化として、agent profileへの適用拒否をpgTAP 1件で固定する。
-- PUBLIC既定EXECUTEが残るトリガー関数6件を棚卸しし、直接呼出しが不要であることを確認したうえで`PUBLIC`・`anon`・`authenticated`からEXECUTEをREVOKEする。triggerとしての実行は関数EXECUTE権限に依存しないが、actor意味論とは独立した権限変更なのでBatch 4 migrationへ混在させず、専用migrationと権限回帰テストで対応する。
+- `apply_invited_profile_role`のUPDATE対象を`role = 'pending'`へ限定し、非pending/不存在を`P0002`、不正な付与roleを`22023`で拒否するpgTAPを追加した（`af8a6cb`）。
+- PUBLIC既定EXECUTEが残っていたトリガー関数6件を`PUBLIC`・`anon`・`authenticated`からREVOKEし、全public trigger関数を汎用カタログ検査するpgTAPを追加した（`130022e`）。`refresh_email_thread_from_message`を将来service roleから直接呼ぶ場合は、別のレビュー済みmigrationで明示GRANTする。
 
 ### Batch 5: セッション保存
 
@@ -127,12 +127,12 @@
 
 ### Batch 3後の独立小タスク: テスト安定化と警告除去
 
-- 全体検索テストはfake timersでdebounceを進め、必要な`findBy`だけタイムアウトを5〜7秒へ延長する。
-- 遷移先routeを事前importし、lazy route解決を待つ競合を除く。
-- login系を含む他のlazy route群へ`hydrateFallbackElement`を追加し、警告を消す。
-- 業務ロジックの待機時間は変更せず、テストとrouter初期描画だけを安定化する。
+- 再現調査の結果、主因は多数の重いjsdomテストを複数workerで同時実行した際のCPU・メモリ競合だった。単なるタイムアウト延長や業務ロジックの待機時間変更は行わない。
+- `vite.config.ts`でVitestのfile workerを1本へ固定し、開発者MacとCIで再現性のある実行条件にする。
+- 全体検索テストはクリックナビゲーションの検証に不要な合成hoverを省略し、イベント途中で検索候補が置換される競合を除く。
+- `/forgot-password`、`/set-password`を含む初期lazy routeへ`hydrateFallbackElement`を追加し、HydrateFallback警告を消す。
 
-状態: 未着手。Batch 3完了後に独立して行う。
+状態: Fable 5承認済み。ローカル実装・検証とレビュー用ブランチのCIまで完了。全体検索テストは10回連続成功。最終ローカル全体テストは71ファイル・376件成功し、HydrateFallback警告は0件。`vite.config.ts`には、将来CI時間が問題化してもworker競合を戻さず、重いjsdom suiteを分離する方針を記録した（`7892d64`）。実装検証HEAD `f840963`のCI Run `31808266181`ではmacOS・Windows・Supabase全3ジョブが成功し、Test stepはmacOS 1分46秒、Windows 2分25秒だった。
 
 ## 4. 今回の検証結果
 

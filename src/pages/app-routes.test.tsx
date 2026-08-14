@@ -1130,7 +1130,10 @@ describe("Candidate CRM Phase 2.5 routes", () => {
   });
 
   it("全体検索から候補者詳細へ移動できる", async () => {
-    const user = userEvent.setup();
+    // Hovering a result updates the active option before the click. Skipping
+    // the synthetic hover keeps this test focused on the click navigation and
+    // avoids replacing the option between pointer events under a busy jsdom.
+    const user = userEvent.setup({ skipHover: true });
     renderRoute("/");
 
     const searchInput = await screen.findByRole("combobox", {

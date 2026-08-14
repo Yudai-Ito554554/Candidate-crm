@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(14);
+select extensions.plan(22);
 
 create function pg_temp.set_request_context(
   target_user_id uuid,
@@ -76,11 +76,72 @@ values
     '{}',
     now(),
     now()
+  ),
+  (
+    '40000000-0000-0000-0000-000000000004',
+    'authenticated',
+    'authenticated',
+    'batch4-agent@example.invalid',
+    '',
+    now(),
+    '{}',
+    '{}',
+    now(),
+    now()
+  ),
+  (
+    '40000000-0000-0000-0000-000000000005',
+    'authenticated',
+    'authenticated',
+    'batch4-viewer@example.invalid',
+    '',
+    now(),
+    '{}',
+    '{}',
+    now(),
+    now()
+  ),
+  (
+    '40000000-0000-0000-0000-000000000006',
+    'authenticated',
+    'authenticated',
+    'batch4-second-admin@example.invalid',
+    '',
+    now(),
+    '{}',
+    '{}',
+    now(),
+    now()
+  ),
+  (
+    '40000000-0000-0000-0000-000000000007',
+    'authenticated',
+    'authenticated',
+    'batch4-suspended@example.invalid',
+    '',
+    now(),
+    '{}',
+    '{}',
+    now(),
+    now()
   );
 
 update public.profiles
-set role = 'admin'
-where id = '40000000-0000-0000-0000-000000000001';
+set role = case id
+  when '40000000-0000-0000-0000-000000000001' then 'admin'
+  when '40000000-0000-0000-0000-000000000004' then 'agent'
+  when '40000000-0000-0000-0000-000000000005' then 'viewer'
+  when '40000000-0000-0000-0000-000000000006' then 'admin'
+  when '40000000-0000-0000-0000-000000000007' then 'suspended'
+  else role
+end
+where id in (
+  '40000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000004',
+  '40000000-0000-0000-0000-000000000005',
+  '40000000-0000-0000-0000-000000000006',
+  '40000000-0000-0000-0000-000000000007'
+);
 
 insert into public.candidates (id, owner_id, full_name)
 values (
@@ -100,6 +161,120 @@ set full_name = 'Batch 4 user update'
 where id = '41000000-0000-0000-0000-000000000001';
 
 reset role;
+
+create temporary table batch4_rejected_invite_audit_baseline as
+select count(*)::bigint as audit_count
+from public.audit_logs
+where entity_id in (
+  '40000000-0000-0000-0000-000000000004',
+  '40000000-0000-0000-0000-000000000005',
+  '40000000-0000-0000-0000-000000000006',
+  '40000000-0000-0000-0000-000000000007'
+);
+
+select pg_temp.set_request_context(null, 'service_role');
+set local role service_role;
+
+select extensions.throws_ok(
+  $$select public.apply_invited_profile_role(
+    '40000000-0000-0000-0000-000000000004',
+    'viewer',
+    '40000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002',
+  'invited profile not found',
+  'the invite role RPC rejects an already-approved agent profile'
+);
+
+select extensions.throws_ok(
+  $$select public.apply_invited_profile_role(
+    '40000000-0000-0000-0000-000000000005',
+    'agent',
+    '40000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002',
+  'invited profile not found',
+  'the invite role RPC rejects an already-approved viewer profile'
+);
+
+select extensions.throws_ok(
+  $$select public.apply_invited_profile_role(
+    '40000000-0000-0000-0000-000000000006',
+    'viewer',
+    '40000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002',
+  'invited profile not found',
+  'the invite role RPC rejects an administrator profile'
+);
+
+select extensions.throws_ok(
+  $$select public.apply_invited_profile_role(
+    '40000000-0000-0000-0000-000000000007',
+    'agent',
+    '40000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002',
+  'invited profile not found',
+  'the invite role RPC rejects a suspended profile'
+);
+
+select extensions.throws_ok(
+  $$select public.apply_invited_profile_role(
+    '40000000-0000-0000-0000-000000000099',
+    'agent',
+    '40000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002',
+  'invited profile not found',
+  'the invite role RPC does not distinguish a missing profile'
+);
+
+select extensions.throws_ok(
+  $$select public.apply_invited_profile_role(
+    '40000000-0000-0000-0000-000000000003',
+    'pending',
+    '40000000-0000-0000-0000-000000000001'
+  )$$,
+  '22023',
+  'invite role must be agent or viewer',
+  'the invite role RPC validates the requested role before profile state'
+);
+
+reset role;
+
+select extensions.is(
+  (
+    select array_agg(role::text order by id)
+    from public.profiles
+    where id in (
+      '40000000-0000-0000-0000-000000000004',
+      '40000000-0000-0000-0000-000000000005',
+      '40000000-0000-0000-0000-000000000006',
+      '40000000-0000-0000-0000-000000000007'
+    )
+  ),
+  array['agent', 'viewer', 'admin', 'suspended']::text[],
+  'rejected invite role assignments leave existing roles unchanged'
+);
+
+select extensions.is(
+  (
+    select count(*)::bigint
+    from public.audit_logs
+    where entity_id in (
+      '40000000-0000-0000-0000-000000000004',
+      '40000000-0000-0000-0000-000000000005',
+      '40000000-0000-0000-0000-000000000006',
+      '40000000-0000-0000-0000-000000000007'
+    )
+  ),
+  (select audit_count from batch4_rejected_invite_audit_baseline),
+  'rejected invite role assignments do not append audit rows'
+);
+
+select set_config('app.audit_actor_id', '', true);
+select pg_temp.set_request_context(null, 'postgres');
 
 select extensions.is(
   (

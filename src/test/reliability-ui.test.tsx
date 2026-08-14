@@ -57,6 +57,7 @@ describe("application reliability UI", () => {
           },
           element: <p>通常画面</p>,
           errorElement: <RouteErrorPage />,
+          hydrateFallbackElement: <p>画面を読み込んでいます…</p>,
         },
       ],
       { initialEntries: ["/"] },
