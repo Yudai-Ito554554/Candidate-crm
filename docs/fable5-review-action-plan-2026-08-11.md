@@ -114,7 +114,7 @@
 - 移行時に既存セッションを安全に消去または移送する。
 - パスワード自体は保存しない。
 
-状態: `fable5-session-keychain-batch5`で実装済み、Fable 5レビュー待ち。Fable 5設計の案Aを採用し、refresh tokenだけをOS資格情報ストアへ保存する。パスワード保存・localStorageフォールバック・DB migrationは追加していない。
+状態: 完了。Fable 5設計の案Aを採用し、refresh tokenだけをOS資格情報ストアへ保存した。Fable 5は`d7aebd1..bfaa033`をApprove（Blocker/High/Mediumなし）し、`main`へ`--no-ff`マージ済み（`2e8e84e`）。パスワード保存・localStorageフォールバック・DB migrationは追加していない。2026-08-14のmacOS実機UATで、本番・STAGING双方の終了/再起動後のセッション復元、本番ログアウト後もSTAGINGが維持される資格情報分離、新本番版のログイン/復元を確認した。Keychain明示拒否は自動テストのみ、Windows Credential Managerの実機UATはWindows端末入手後に行う。
 
 ### Batch 6: 外部提供基盤
 
