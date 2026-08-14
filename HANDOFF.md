@@ -62,7 +62,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 - Batch 3: `supabase/migrations/20260813024735_optimize_rls_role_initplan.sql`で51 policy・66箇所のロール参照をInitPlan形へ変更し、pgTAPとVitestで完全性・認可不変・実行計画を検証。Fable 5承認後に`main`へ`--no-ff`マージし、Run `31689015343`のmacOS・Windows・Supabase全ジョブが成功した。
 - Batch 4: `supabase/migrations/20260813103834_audit_actor_attribution.sql`で監査actorを`user`/`service`/`system`へ分類し、AIサマリー保存と招待時ロール設定のverified requester帰属を実装。Fable 5は`8351cd5..b759c20`をApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`03cde05`）で、Run `31695344851`のmacOS・Windows・Supabase全ジョブが成功した。Low 1件は`apply_invited_profile_role`の更新対象を`pending`へ限定し、非pending profileでは`P0002`で拒否する防御強化で、次バッチ冒頭にpgTAP 1件と合わせて対応する。
 - Batch 5: Tauri/Rustの固定allowlist付き資格情報コマンドとReact側のsecure session bootstrapを実装し、refresh tokenのみをOS資格情報ストアへ保存する。Fable 5は`d7aebd1..bfaa033`をApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`2e8e84e`）で、Run `31763405157`のmacOS・Windows・Supabase全3ジョブが成功した。2026-08-14のmacOS実機UATで本番・STAGINGのセッション復元、ログアウト削除、環境間分離を確認した。Keychain明示拒否の実機操作とWindows Credential Manager実機UATは未実施。
-- production初回バックアップ、launchd登録、初回restore drillはオーナー作業であり未実施。staging・productionへの接続や変更は行っていない。
+- production初回バックアップ、launchd日次登録、48時間freshness監視、初回restore drillは2026-08-14に完了した。restore drillではproductionへ書き込まず、使い捨てローカル環境でDB件数・Storage件数・Auth・主要参照APIを確認し、完了後に隔離リソースを削除した。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 

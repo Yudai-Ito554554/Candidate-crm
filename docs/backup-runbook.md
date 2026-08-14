@@ -1,13 +1,13 @@
 # Candidate CRM 自動バックアップRunbook
 
-最終更新: 2026-08-13
+最終更新: 2026-08-14
 
 対象: オーナーMacで稼働するCandidate CRM内部利用版
 
 ## 1. 安全境界
 
 - 実行対象はDB論理ダンプ、Storageの`crm-files`、取得メタデータです。
-- production初回実行、launchd登録、初回restore drillはオーナーが行います。Codexは実行しません。
+- production初回実行、launchd登録、初回restore drillは、接続先と対象範囲を機械的に検証したうえで実施します。人手が必要な秘密入力以外は自動化された手順を優先します。
 - メイン開発リポジトリをSupabase projectへlinkしません。専用workdirだけを使用します。
 - スクリプトは`supabase projects api-keys`を実行しません。service role keyも使用しません。
 - 保存先はFileVaultが有効な内蔵ボリュームに限定します。外部媒体・クラウドへ複製する場合も暗号化が必須です。
@@ -132,17 +132,28 @@ productionの正しい接続情報を意図的に壊して試験しません。
 - production refとの不一致を破壊的コマンド直前に再確認します。
 - 実施日、対象snapshot、結果、実施者を共有範囲を限定した運用記録へ残します。秘密や実パスは記録しません。
 
+### 8.1 初回実施記録
+
+2026-08-14に、productionへ接続しない使い捨てDockerネットワーク・DBボリュームで初回drillを実施しました。取得済みsnapshotのchecksumとproject refを先に検証し、Supabase Postgres/Auth/Storageスキーマを隔離環境へ初期化してから、DBダンプを単一トランザクションで復元しました。
+
+- `auth.users`、`public.profiles`、`public.candidates`、`storage.objects`の復元件数が取得時点の期待値と一致した。
+- Auth health endpointとPostgREST health endpointが正常応答した。
+- 復元済みユーザーのJWTコンテキストで、候補者・プロフィール・ファイルの主要参照APIが正常応答した。
+- 対象snapshotのStorage実体は0件だったため、ファイル実体コピーは発生せず、`storage.objects`件数0とmetadataの`fileCount` 0の一致を確認した。
+- 完了後に使い捨てコンテナ、ボリューム、ネットワークを削除し、既存ローカルSupabaseが継続してhealthyであることを確認した。
+- productionへの書き込みは行っていない。
+
 ## 9. オーナーチェックリスト
 
-| 項目                                  | 状態   |
-| ------------------------------------- | ------ |
-| FileVault有効化を確認                 | 未実施 |
-| production専用設定とworkdirを作成     | 未実施 |
-| production初回バックアップ成功        | 未実施 |
-| DB・Storage・checksum・metadataを確認 | 未実施 |
-| 失敗通知を実機で確認                  | 未実施 |
-| launchdを登録して翌日実行を確認       | 未実施 |
-| freshness監視を登録して動作確認       | 未実施 |
-| 週次で最新の完了snapshotを確認        | 未実施 |
-| stale lock・不完全snapshot復旧を確認  | 未実施 |
-| 分離環境への初回restore drill成功     | 未実施 |
+| 項目                                  | 状態                               |
+| ------------------------------------- | ---------------------------------- |
+| FileVault有効化を確認                 | 未実施                             |
+| production専用設定とworkdirを作成     | 完了                               |
+| production初回バックアップ成功        | 完了                               |
+| DB・Storage・checksum・metadataを確認 | 完了                               |
+| 失敗通知を実機で確認                  | 未実施                             |
+| launchdを登録して翌日実行を確認       | 登録・実地起動済み（翌日定刻待ち） |
+| freshness監視を登録して動作確認       | 完了                               |
+| 週次で最新の完了snapshotを確認        | 未実施                             |
+| stale lock・不完全snapshot復旧を確認  | 未実施                             |
+| 分離環境への初回restore drill成功     | 完了                               |

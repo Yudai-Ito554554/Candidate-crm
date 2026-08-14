@@ -72,7 +72,7 @@
 - 成功・失敗通知、保持期間、暗号化、復元drill周期を定める。
 - production障害時に候補者データを復元できない現在進行形のリスクを、性能改善より先に閉じる。
 
-状態: `fable5-followups-batch2`で実装・ローカル検証中。DB論理ダンプ、Storage `crm-files`、checksum・metadata、日次14世代+週次8世代、macOS通知+ログ、launchdテンプレート、restore drill Runbookを追加した。production初回実行、launchd登録、初回restore drillはオーナー作業として未実施。
+状態: 完了。DB論理ダンプ、Storage `crm-files`、checksum・metadata、日次14世代+週次8世代、macOS通知+ログ、launchd、48時間freshness監視をproduction内部利用Macへ設定した。2026-08-14に初回バックアップと分離環境restore drillを実施し、DB件数・Storage件数・Auth・主要参照APIの一致を確認した。productionへの復元書き込みは行っていない。
 
 ### Batch 3: RLS性能改善
 
