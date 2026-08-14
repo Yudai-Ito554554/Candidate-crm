@@ -100,8 +100,8 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 3. **S3-7の企業・求人アーカイブ/復元の実地確認**（候補者は完了済み）。
 4. Stage 3残項目（招待メールの実地確認、AI求人取り込み例外系のOS実機一連UAT）を優先順位順に進める。
 5. 外部提供前に: Apple Developer Program登録・署名・Notarization（C-2）、Windowsコード署名証明書（C-3）、Supabase Proプランの再判定（C-4/C-5）。
-6. バックログ（Stage 3の必須項目ではない）: ログイン情報入力省略機能。メールアドレスの安全な自動入力、パスワードはOSのKeychain/Credential Manager等の安全な資格情報保管を使う（`localStorage`使用は`AGENTS.md`のルール上不可）。詳細は`docs/development-handoff-2026-08-11.md`の「将来改善」節。
-7. **Batch 5（セッション保存）**: Supabase Auth custom storage adapter、Tauri/Rust側のOS資格情報保管、既存localStorageセッションの安全な移行・消去を、Fable 5の設計レビュー後に実装する。パスワード自体は保存しない。
+6. **Batch 5（セッション保存）**: `fable5-session-keychain-batch5`で実装済み、Fable 5レビュー待ち。パスワードは保存せず、Supabase refresh tokenだけをmacOS Keychain / Windows Credential Managerへ保存する。`persistSession: false`でaccess token・user情報はメモリだけに保持し、既存localStorageセッションは初回起動時に移行成否にかかわらず削除する。
+7. バックログ（Stage 3の必須項目ではない）: メールアドレスの安全な自動入力。これは非機密設定として扱い、パスワードや候補者情報を保存しない。
 8. **Batch 4残Low**: `apply_invited_profile_role`を`pending` profile限定へ狭める防御強化をpgTAPとともに実施する。PUBLIC既定EXECUTEが残るトリガー関数6件のREVOKEは、actor意味論と分離した専用migration・権限回帰テストとして扱う。
 
 ---

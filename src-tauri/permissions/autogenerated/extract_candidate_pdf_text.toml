@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-extract-candidate-pdf-text"
+description = "Enables the extract_candidate_pdf_text command without any pre-configured scope."
+commands.allow = ["extract_candidate_pdf_text"]
+
+[[permission]]
+identifier = "deny-extract-candidate-pdf-text"
+description = "Denies the extract_candidate_pdf_text command without any pre-configured scope."
+commands.deny = ["extract_candidate_pdf_text"]

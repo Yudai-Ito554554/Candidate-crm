@@ -8,6 +8,12 @@ import {
 } from "@/features/auth/auth-context";
 import { installAuthDeepLinkListener } from "@/features/auth/auth-deep-link";
 import { translateAuthError } from "@/features/auth/auth-errors";
+import {
+  bootstrapSecureSession,
+  deleteStoredRefreshToken,
+  persistAuthStateChange,
+  setStoredRefreshToken,
+} from "@/features/auth/secure-session";
 import { environment } from "@/lib/env";
 import { getSupabaseClient } from "@/lib/supabase";
 
@@ -21,37 +27,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!environment.success) return;
+    const config = environment.data;
 
     let isMounted = true;
     let unsubscribe: (() => void) | undefined;
     let unsubscribeDeepLinks: (() => void) | undefined;
+    let credentialOperation = Promise.resolve();
 
     void getSupabaseClient()
       .then(async (client) => {
         if (!client || !isMounted) return;
 
-        const { data, error } = await client.auth.getSession();
-        if (!isMounted) return;
-        if (error) {
-          setErrorMessage(
-            translateAuthError(
-              error.message,
-              "認証状態を確認できませんでした。アプリを再起動してください。",
-            ),
-          );
-        }
-        setSession(data.session);
-        setStatus(data.session ? "authenticated" : "unauthenticated");
-
         const { data: listener } = client.auth.onAuthStateChange(
           (event, nextSession) => {
             if (!isMounted) return;
+            // persistSession=false initializes with an empty in-memory store.
+            // The explicit Keychain/Credential Manager bootstrap below owns
+            // the initial state and must not be preempted by INITIAL_SESSION.
+            if (event === "INITIAL_SESSION") return;
+            // Supabase warns against awaiting work inside this callback. Queue
+            // each awaited secure-store operation instead, preserving token
+            // rotation order and serializing Windows credential access.
+            credentialOperation = credentialOperation.then(() =>
+              persistAuthStateChange(event, nextSession),
+            );
             if (event === "SIGNED_OUT") queryClient.clear();
             setSession(nextSession);
             setStatus(nextSession ? "authenticated" : "unauthenticated");
           },
         );
         unsubscribe = () => listener.subscription.unsubscribe();
+
+        const restoredSession = await bootstrapSecureSession(
+          client,
+          config.VITE_SUPABASE_URL,
+        );
+        if (!isMounted) return;
+        setSession(restoredSession);
+        setStatus(restoredSession ? "authenticated" : "unauthenticated");
 
         const removeDeepLinkListener = await installAuthDeepLinkListener(
           client,
@@ -120,6 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return false;
           }
 
+          try {
+            await setStoredRefreshToken(data.session.refresh_token);
+          } catch {
+            // Secure-store failures are fail-closed for future restoration,
+            // but the current in-memory session remains usable.
+          }
+
           setSession(data.session);
           setStatus("authenticated");
           return true;
@@ -145,6 +165,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               ),
             );
             return false;
+          }
+
+          try {
+            await deleteStoredRefreshToken();
+          } catch {
+            // SIGNED_OUT also queues deletion. If the OS store is unavailable,
+            // the Supabase session and application cache are still cleared.
           }
 
           queryClient.clear();
