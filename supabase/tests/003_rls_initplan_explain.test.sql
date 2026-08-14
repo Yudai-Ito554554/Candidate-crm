@@ -4,6 +4,11 @@ create extension if not exists pgtap with schema extensions;
 
 select extensions.plan(1);
 
+-- EXPLAIN wording may change across PostgreSQL major versions. If this proof
+-- fails after an upgrade, check 002_rls_initplan.test.sql first: a passing 002
+-- means policy shape is still protected and this plan-text assertion needs
+-- maintenance rather than an immediate policy rewrite.
+
 insert into auth.users (
   id,
   aud,
