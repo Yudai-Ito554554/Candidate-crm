@@ -181,4 +181,49 @@ Fable 5の正式回答は`docs/fable5-review-low-hardening-result-2026-08-14.md`
 | Batch 4 trigger EXECUTE整理    | `130022e`  | 完了。汎用カタログpgTAPと将来のメール同期復帰経路コメントを追加       |
 | Batch 2 freshness通知hardening | `39b5232`  | 完了。一時マーカー、ERR補助trap、動的閾値表示を追加                   |
 
-ブランチHEAD、CI Run ID、CI実測所要時間、全検証結果は、ブランチpush後に本節へ追記する。
+### 9.1 実装HEADとCI
+
+- 実装検証HEAD: `f840963938ce5aac3a7a211c5d713ee96dc46808`
+- 成功CI Run ID: `31808266181`
+- CI URL: <https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31808266181>
+
+| ジョブ                               | 結果 | 所要時間 | Test step |
+| ------------------------------------ | ---- | -------- | --------- |
+| Quality checks (`macos-latest`)      | 成功 | 4分26秒  | 1分46秒   |
+| Quality checks (`windows-latest`)    | 成功 | 8分14秒  | 2分25秒   |
+| Supabase migration and policy checks | 成功 | 2分46秒  | 3秒       |
+
+比較対象Run `31794106603`（同じ`maxWorkers: 1`を含む最初の公開HEAD）では、macOSが7分02秒（Test 2分36秒）、Windowsが6分46秒（Test 2分15秒）だった。今回のTest stepはmacOSで50秒短縮、Windowsで10秒増加に収まり、worker 1本固定によるCI時間は現行規模で許容範囲と判断した。ジョブ全体の変動は主にRust/Tauriビルド時間であり、Vitest固定workerの増加ではない。テスト規模が増えてCI時間が問題化した場合は、worker競合を戻さず重いjsdom suiteを分離する。
+
+### 9.2 ローカル検証
+
+| チェック                 | 結果                              |
+| ------------------------ | --------------------------------- |
+| `npm run format:check`   | 成功                              |
+| `npm run typecheck`      | 成功                              |
+| `npm run lint`           | 成功                              |
+| `npm test`               | 71ファイル・376件成功（105.45秒） |
+| `npm run build`          | 成功                              |
+| `npm run verify:repo`    | 成功                              |
+| `npm run supabase:reset` | 全migration再適用成功             |
+| `npm run supabase:test`  | 6ファイル・70 assertion成功       |
+| `git diff --check`       | 成功                              |
+
+最初のCI Run `31797310203`では、追加pgTAPのfixtureが存在しない`public.app_role`型へcastしていたためSupabaseジョブが失敗した。`f840963`でfixtureを既存スキーマどおりtext値へ修正し、ローカルのクリーンDB再適用・pgTAPと上記CIで再確認した。アプリ、RLS、migration本体の意味論は変更していない。
+
+ローカルVitestでは、高負荷状態で既知の`app-routes.test.tsx`タイムアウトが一度再現し、対象単体は直後に468msで成功、クリーンな全体再実行は376件すべて成功した。CIのmacOS・Windowsでも全件成功しており、製品コードの回帰ではなくホスト資源競合として扱う。M4の将来方針は重いjsdom suiteの分離であり、業務タイムアウト延長やworker並列化への巻き戻しは行わない。
+
+### 9.3 運用状態
+
+production初回バックアップ、分離環境restore drill、launchdのバックアップ・freshness監視登録、および登録直後のlaunchd実地実行は完了している。翌日の定刻自動実行は、次回Mac利用時にログと最新snapshotで確認する運用項目として残る。今回のLow hardening実装・検証ではproduction / stagingへ接続・変更していない。
+
+### 9.4 Fable 5への実装後レビュー依頼
+
+`da7135d..f840963`を対象に、次を正式レビューしてください。
+
+1. M4の固定worker、`skipHover`、HydrateFallback補完とCI実測が妥当か。
+2. pending限定RPCの失敗意味論と、非pending・不存在・pending付与拒否テストが十分か。
+3. trigger-only関数のEXECUTE境界と、将来メール同期時の明示GRANT復帰経路が妥当か。
+4. RLS pgTAP診断分割とEXPLAIN保守コメントが十分か。
+5. freshnessの一時通知マーカー、補助ERR trap、動的閾値表示が二重通知や秘密値漏洩を起こさないか。
+6. Blocker / High / Mediumの有無と、`main`へのマージ可否。

@@ -49,13 +49,13 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 13. **Fable 5レビュー対応Batch 4の完了**（マージcommit `03cde05`）: `audit_logs.actor_kind`で`user`/`service`/`system`を区別し、認証済み操作、検証済みrequesterを伝播するservice-only RPC、メール同期等のsystem operationを監査上判別可能にした。`store_candidate_ai_summary`と`invite-user`のactor帰属を修正し、pgTAP T1〜T6を含む14 assertionとVitest静的確認を追加。Fable 5は`8351cd5..b759c20`をApproveし、Blocker/High/Mediumなし。`main`マージCI Run `31695344851`はmacOS・Windows・Supabaseの全3ジョブ成功。Lowは招待専用RPCの更新対象を`pending`へ限定する防御強化と、PUBLIC既定EXECUTEが残るトリガー関数6件の権限整理。
 14. **Fable 5レビュー対応Batch 5の完了**（マージcommit `2e8e84e`）: Supabaseのrefresh tokenだけをmacOS Keychain / Windows Credential Managerへ保存し、access tokenとユーザー情報はメモリだけに保持する。`persistSession: false`とし、旧localStorageセッションは初回移行の成否にかかわらず削除する。Fable 5は`d7aebd1..bfaa033`をApproveし、Blocker/High/Mediumなし。macOS実機では本番・STAGING双方の終了/再起動後のセッション復元、本番ログアウト後もSTAGINGが維持される資格情報分離、新本番版のログイン/復元を確認した。Keychain明示拒否は実機未実施だが、資格情報ストア拒否時に平文fallbackせず`null`を返すfail-closed挙動は自動テストで確認済み。Windows実機UATはStage 3へ延期。
 15. **M4テスト安定化とRouter警告除去**（レビュー用ブランチ）: Vitestの多数のjsdomファイルを並列実行した際のCPU・メモリ競合が、正常な非同期UI待機を5秒超へ押し出す主因と特定した。テストworkerを1本へ固定し、全体検索テストではクリック検証に不要な合成hoverを省略した。初期lazy routeへ`hydrateFallbackElement`を補完し、React Router警告を除去した。全体検索テストは10回連続成功、全体は69ファイル・365件成功、HydrateFallback警告0件を確認済み。Fable 5は条件付きApproveし、将来はworker競合を戻さず重いjsdom suiteを分離する方針を`vite.config.ts`へ記録した（`7892d64`）。
-16. **残Low hardeningの実装**（レビュー用ブランチ）: Batch 3のpgTAP診断分割（`40b3289`）、招待RPCのpending限定（`af8a6cb`）、trigger-only関数の直接EXECUTE権限整理（`130022e`）、freshness通知の一時マーカー・ERR補助trap・動的閾値表示（`39b5232`）を、Fable 5承認済み設計どおり実装した。production / staging操作は行っていない。
+16. **残Low hardeningの実装・CI検証**（レビュー用ブランチ）: Batch 3のpgTAP診断分割（`40b3289`）、招待RPCのpending限定（`af8a6cb`）、trigger-only関数の直接EXECUTE権限整理（`130022e`）、freshness通知の一時マーカー・ERR補助trap・動的閾値表示（`39b5232`）を、Fable 5承認済み設計どおり実装した。fixture修正後の実装検証HEADは`f840963`、CI Run `31808266181`はmacOS・Windows・Supabaseの全3ジョブ成功。ローカルでもVitest 71ファイル・376件、pgTAP 6ファイル・70 assertion、全品質チェックが成功した。production / staging操作は行っていない。
 
 ---
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 1〜5とproductionバックアップ・restore drillは完了。現在はM4テスト安定化と残Low hardeningをレビュー用ブランチへ実装済みで、全検証・CI証跡の確定中。**
+**Fable 5レビュー対応Batch 1〜5とproductionバックアップ・restore drillは完了。M4テスト安定化と残Low hardeningもレビュー用ブランチへ実装し、ローカル全検証とCI Run `31808266181`の全3ジョブ成功まで確定した。現在はFable 5の実装後レビュー待ち。**
 
 - R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
 - R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
@@ -66,6 +66,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 - Batch 5: Tauri/Rustの固定allowlist付き資格情報コマンドとReact側のsecure session bootstrapを実装し、refresh tokenのみをOS資格情報ストアへ保存する。Fable 5は`d7aebd1..bfaa033`をApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`2e8e84e`）で、Run `31763405157`のmacOS・Windows・Supabase全3ジョブが成功した。2026-08-14のmacOS実機UATで本番・STAGINGのセッション復元、ログアウト削除、環境間分離を確認した。Keychain明示拒否の実機操作とWindows Credential Manager実機UATは未実施。
 - production初回バックアップ、launchd日次登録、48時間freshness監視、初回restore drillは2026-08-14に完了した。restore drillではproductionへ書き込まず、使い捨てローカル環境でDB件数・Storage件数・Auth・主要参照APIを確認し、完了後に隔離リソースを削除した。
 - M4: 高並列jsdom実行によるホスト資源競合を再現し、`vite.config.ts`でテストworkerを1本へ固定した。全体検索テストは不要なhoverイベントを省略し、Routerの初期lazy routeには適切なfallbackを追加した。全体検索10回連続と全365件で成功し、HydrateFallback警告が出ないことを確認した。Fable 5の条件付きApproveを反映し、将来のテスト増加時はworker競合を戻さず重いjsdom suiteを分離する方針を追記した。
+- 残Low hardening: 実装検証HEAD `f840963`のCI Run `31808266181`で、macOS 4分26秒、Windows 8分14秒、Supabase 2分46秒ですべて成功した。VitestのTest stepはmacOS 1分46秒、Windows 2分25秒で、worker 1本固定は現行規模で許容範囲。詳細とFable 5レビュー論点は`docs/fable5-design-review-request-low-hardening-2026-08-14.md`を正本とする。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
@@ -107,7 +108,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 5. 外部提供前に: Apple Developer Program登録・署名・Notarization（C-2）、Windowsコード署名証明書（C-3）、Supabase Proプランの再判定（C-4/C-5）。
 6. **Batch 5残UAT**: Windows実機入手後にCredential Managerでログイン復元・ログアウト削除・staging/production分離を確認する。macOS Keychain明示拒否は、内部版で安全に再現できる手順を定めたうえで補完する。
 7. バックログ（Stage 3の必須項目ではない）: メールアドレスの安全な自動入力。これは非機密設定として扱い、パスワードや候補者情報を保存しない。
-8. **Batch 4残Low**: `apply_invited_profile_role`を`pending` profile限定へ狭める防御強化をpgTAPとともに実施する。PUBLIC既定EXECUTEが残るトリガー関数6件のREVOKEは、actor意味論と分離した専用migration・権限回帰テストとして扱う。
+8. **残Low hardeningのレビュー完了・main反映**: 実装とCIは`fable5-low-hardening-review`の`f840963`まで完了済み。Fable 5へ`docs/fable5-design-review-request-low-hardening-2026-08-14.md`を渡して実装後レビューを受け、Approve後に`main`へ`--no-ff`でマージする。
 
 ---
 
@@ -279,7 +280,7 @@ npm run supabase:stop
    - `docs/production-release-runbook.md` — 本番への実操作手順（実際にproductionを触る場合のみ）
    - `docs/rollback-runbook.md` — 配布後に問題が出た場合の切り戻し手順
 
-3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。ユーザーから別の指示がなければ、Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。コード実装を続ける場合は、`docs/fable5-design-review-request-low-hardening-2026-08-14.md`をFable 5へ渡し、Batch 2〜4の残Lowに関する設計・受け入れ条件の承認を得てからCodexが実装する。
+3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。まず`docs/fable5-design-review-request-low-hardening-2026-08-14.md`をFable 5へ渡して実装後レビューを受け、Approve後にレビュー用ブランチを`main`へマージする。その後、Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。
 
 4. **作業前の安全確認（このプロジェクト特有のルール）**:
    - `.env.local`・`.env`はコミット対象外であることを都度確認（`git status --ignored`で`!!`表示になっているか）
