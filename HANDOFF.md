@@ -48,23 +48,24 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 12. **Fable 5レビュー対応Batch 3の完了**（マージcommit `b4d1301`）: 51件の有効なRLS policyにある行非依存の`public.current_profile_role()`全66箇所を`(select public.current_profile_role())`へ変更し、PostgreSQL InitPlanでstatement単位に評価される形へ最適化。`USING`/`WITH CHECK`の認可真理値は維持し、カタログ完全性テストと認証済み候補者一覧の`EXPLAIN`テストを追加した。Fable 5はApprove、Blocker/High/Mediumなし。LowはpgTAP診断の分割とEXPLAINテストの保守コメントのみ。
 13. **Fable 5レビュー対応Batch 4の完了**（マージcommit `03cde05`）: `audit_logs.actor_kind`で`user`/`service`/`system`を区別し、認証済み操作、検証済みrequesterを伝播するservice-only RPC、メール同期等のsystem operationを監査上判別可能にした。`store_candidate_ai_summary`と`invite-user`のactor帰属を修正し、pgTAP T1〜T6を含む14 assertionとVitest静的確認を追加。Fable 5は`8351cd5..b759c20`をApproveし、Blocker/High/Mediumなし。`main`マージCI Run `31695344851`はmacOS・Windows・Supabaseの全3ジョブ成功。Lowは招待専用RPCの更新対象を`pending`へ限定する防御強化と、PUBLIC既定EXECUTEが残るトリガー関数6件の権限整理。
 14. **Fable 5レビュー対応Batch 5の完了**（マージcommit `2e8e84e`）: Supabaseのrefresh tokenだけをmacOS Keychain / Windows Credential Managerへ保存し、access tokenとユーザー情報はメモリだけに保持する。`persistSession: false`とし、旧localStorageセッションは初回移行の成否にかかわらず削除する。Fable 5は`d7aebd1..bfaa033`をApproveし、Blocker/High/Mediumなし。macOS実機では本番・STAGING双方の終了/再起動後のセッション復元、本番ログアウト後もSTAGINGが維持される資格情報分離、新本番版のログイン/復元を確認した。Keychain明示拒否は実機未実施だが、資格情報ストア拒否時に平文fallbackせず`null`を返すfail-closed挙動は自動テストで確認済み。Windows実機UATはStage 3へ延期。
-15. **M4テスト安定化とRouter警告除去**（レビュー用ブランチ）: Vitestの多数のjsdomファイルを並列実行した際のCPU・メモリ競合が、正常な非同期UI待機を5秒超へ押し出す主因と特定した。テストworkerを1本へ固定し、全体検索テストではクリック検証に不要な合成hoverを省略した。初期lazy routeへ`hydrateFallbackElement`を補完し、React Router警告を除去した。全体検索テストは10回連続成功、全体は69ファイル・365件成功、HydrateFallback警告0件を確認済み。
+15. **M4テスト安定化とRouter警告除去**（レビュー用ブランチ）: Vitestの多数のjsdomファイルを並列実行した際のCPU・メモリ競合が、正常な非同期UI待機を5秒超へ押し出す主因と特定した。テストworkerを1本へ固定し、全体検索テストではクリック検証に不要な合成hoverを省略した。初期lazy routeへ`hydrateFallbackElement`を補完し、React Router警告を除去した。全体検索テストは10回連続成功、全体は69ファイル・365件成功、HydrateFallback警告0件を確認済み。Fable 5は条件付きApproveし、将来はworker競合を戻さず重いjsdom suiteを分離する方針を`vite.config.ts`へ記録した（`7892d64`）。
+16. **残Low hardeningの実装**（レビュー用ブランチ）: Batch 3のpgTAP診断分割（`40b3289`）、招待RPCのpending限定（`af8a6cb`）、trigger-only関数の直接EXECUTE権限整理（`130022e`）、freshness通知の一時マーカー・ERR補助trap・動的閾値表示（`39b5232`）を、Fable 5承認済み設計どおり実装した。production / staging操作は行っていない。
 
 ---
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 1〜5とproductionバックアップ・restore drillは完了。現在はM4テスト安定化と残Low hardening設計をレビュー用ブランチへ準備中。**
+**Fable 5レビュー対応Batch 1〜5とproductionバックアップ・restore drillは完了。現在はM4テスト安定化と残Low hardeningをレビュー用ブランチへ実装済みで、全検証・CI証跡の確定中。**
 
 - R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
 - R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
 - R5: `pending`を初回承認待ち専用とし、割当UIから除外。DB RPCは保守用に5値を維持。
 - Batch 2: `scripts/backup/`へDB/Storageバックアップ、ローテーション、freshness監視、launchdテンプレートを追加し、`docs/backup-runbook.md`へ設定・通知・restore drillを記載。
 - Batch 3: `supabase/migrations/20260813024735_optimize_rls_role_initplan.sql`で51 policy・66箇所のロール参照をInitPlan形へ変更し、pgTAPとVitestで完全性・認可不変・実行計画を検証。Fable 5承認後に`main`へ`--no-ff`マージし、Run `31689015343`のmacOS・Windows・Supabase全ジョブが成功した。
-- Batch 4: `supabase/migrations/20260813103834_audit_actor_attribution.sql`で監査actorを`user`/`service`/`system`へ分類し、AIサマリー保存と招待時ロール設定のverified requester帰属を実装。Fable 5は`8351cd5..b759c20`をApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`03cde05`）で、Run `31695344851`のmacOS・Windows・Supabase全ジョブが成功した。Low 1件は`apply_invited_profile_role`の更新対象を`pending`へ限定し、非pending profileでは`P0002`で拒否する防御強化で、次バッチ冒頭にpgTAP 1件と合わせて対応する。
+- Batch 4: `supabase/migrations/20260813103834_audit_actor_attribution.sql`で監査actorを`user`/`service`/`system`へ分類し、AIサマリー保存と招待時ロール設定のverified requester帰属を実装。Fable 5は`8351cd5..b759c20`をApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`03cde05`）で、Run `31695344851`のmacOS・Windows・Supabase全ジョブが成功した。残Lowはレビュー用ブランチで、招待RPCのpending限定（`af8a6cb`）とtrigger-only関数の直接EXECUTE権限整理（`130022e`）として実装済み。
 - Batch 5: Tauri/Rustの固定allowlist付き資格情報コマンドとReact側のsecure session bootstrapを実装し、refresh tokenのみをOS資格情報ストアへ保存する。Fable 5は`d7aebd1..bfaa033`をApprove（Blocker/High/Mediumなし）。`main`へ`--no-ff`マージ済み（`2e8e84e`）で、Run `31763405157`のmacOS・Windows・Supabase全3ジョブが成功した。2026-08-14のmacOS実機UATで本番・STAGINGのセッション復元、ログアウト削除、環境間分離を確認した。Keychain明示拒否の実機操作とWindows Credential Manager実機UATは未実施。
 - production初回バックアップ、launchd日次登録、48時間freshness監視、初回restore drillは2026-08-14に完了した。restore drillではproductionへ書き込まず、使い捨てローカル環境でDB件数・Storage件数・Auth・主要参照APIを確認し、完了後に隔離リソースを削除した。
-- M4: 高並列jsdom実行によるホスト資源競合を再現し、`vite.config.ts`でテストworkerを1本へ固定した。全体検索テストは不要なhoverイベントを省略し、Routerの初期lazy routeには適切なfallbackを追加した。全体検索10回連続と全365件で成功し、HydrateFallback警告が出ないことを確認した。
+- M4: 高並列jsdom実行によるホスト資源競合を再現し、`vite.config.ts`でテストworkerを1本へ固定した。全体検索テストは不要なhoverイベントを省略し、Routerの初期lazy routeには適切なfallbackを追加した。全体検索10回連続と全365件で成功し、HydrateFallback警告が出ないことを確認した。Fable 5の条件付きApproveを反映し、将来のテスト増加時はworker競合を戻さず重いjsdom suiteを分離する方針を追記した。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 

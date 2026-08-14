@@ -168,3 +168,17 @@ CodexはFable 5承認後、次の意味単位で実装する案です。
 6. M4変更のレビュー結果。
 
 承認後の実装、commit、push、CI確認はCodexが担当します。
+
+## 9. Fable 5レビュー結果と実装状況
+
+Fable 5の正式回答は`docs/fable5-review-low-hardening-result-2026-08-14.md`へ記録した。設計判断はすべて実装へ反映済み。
+
+| 項目                           | 実装commit | 状態                                                                  |
+| ------------------------------ | ---------- | --------------------------------------------------------------------- |
+| M4の将来スケーリング注記       | `7892d64`  | 完了。worker 1本を維持し、必要時は重いjsdom suiteを分離する方針を記録 |
+| Batch 3 pgTAP診断性            | `40b3289`  | 完了。件数と直接呼出しを分離し、EXPLAIN保守コメントを追加             |
+| Batch 4 pending限定RPC         | `af8a6cb`  | 完了。非pending/不存在は`P0002`、pending付与は`22023`                 |
+| Batch 4 trigger EXECUTE整理    | `130022e`  | 完了。汎用カタログpgTAPと将来のメール同期復帰経路コメントを追加       |
+| Batch 2 freshness通知hardening | `39b5232`  | 完了。一時マーカー、ERR補助trap、動的閾値表示を追加                   |
+
+ブランチHEAD、CI Run ID、CI実測所要時間、全検証結果は、ブランチpush後に本節へ追記する。
