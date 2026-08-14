@@ -35,5 +35,9 @@ export default defineConfig({
     globals: true,
     setupFiles: "./src/test/setup.ts",
     css: true,
+    // The route suite loads most of the application in jsdom. A single file
+    // worker prevents CPU and memory contention from turning normal async UI
+    // waits into intermittent five-second timeouts on developer and CI hosts.
+    maxWorkers: 1,
   },
 });

@@ -26,10 +26,12 @@ export const appRoutes: RouteObject[] = [
         .ForgotPasswordPage,
     }),
     errorElement: <RouteErrorPage />,
+    hydrateFallbackElement: routeLoadingElement,
   },
   {
     element: <ProtectedRoute />,
     errorElement: <RouteErrorPage />,
+    hydrateFallbackElement: routeLoadingElement,
     children: [
       {
         path: "/set-password",
