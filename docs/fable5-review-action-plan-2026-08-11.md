@@ -127,12 +127,12 @@
 
 ### Batch 3後の独立小タスク: テスト安定化と警告除去
 
-- 全体検索テストはfake timersでdebounceを進め、必要な`findBy`だけタイムアウトを5〜7秒へ延長する。
-- 遷移先routeを事前importし、lazy route解決を待つ競合を除く。
-- login系を含む他のlazy route群へ`hydrateFallbackElement`を追加し、警告を消す。
-- 業務ロジックの待機時間は変更せず、テストとrouter初期描画だけを安定化する。
+- 再現調査の結果、主因は多数の重いjsdomテストを複数workerで同時実行した際のCPU・メモリ競合だった。単なるタイムアウト延長や業務ロジックの待機時間変更は行わない。
+- `vite.config.ts`でVitestのfile workerを1本へ固定し、開発者MacとCIで再現性のある実行条件にする。
+- 全体検索テストはクリックナビゲーションの検証に不要な合成hoverを省略し、イベント途中で検索候補が置換される競合を除く。
+- `/forgot-password`、`/set-password`を含む初期lazy routeへ`hydrateFallbackElement`を追加し、HydrateFallback警告を消す。
 
-状態: 未着手。Batch 3完了後に独立して行う。
+状態: ローカル実装・検証完了、Fable 5レビュー用ブランチへ公開準備中。全体検索テストは10回連続成功。全体テストは69ファイル・365件成功し、HydrateFallback警告は0件。
 
 ## 4. 今回の検証結果
 
