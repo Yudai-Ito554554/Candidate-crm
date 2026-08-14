@@ -128,11 +128,11 @@ values
 
 update public.profiles
 set role = case id
-  when '40000000-0000-0000-0000-000000000001' then 'admin'::public.app_role
-  when '40000000-0000-0000-0000-000000000004' then 'agent'::public.app_role
-  when '40000000-0000-0000-0000-000000000005' then 'viewer'::public.app_role
-  when '40000000-0000-0000-0000-000000000006' then 'admin'::public.app_role
-  when '40000000-0000-0000-0000-000000000007' then 'suspended'::public.app_role
+  when '40000000-0000-0000-0000-000000000001' then 'admin'
+  when '40000000-0000-0000-0000-000000000004' then 'agent'
+  when '40000000-0000-0000-0000-000000000005' then 'viewer'
+  when '40000000-0000-0000-0000-000000000006' then 'admin'
+  when '40000000-0000-0000-0000-000000000007' then 'suspended'
   else role
 end
 where id in (
