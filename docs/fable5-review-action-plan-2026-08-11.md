@@ -123,7 +123,7 @@
 - AI入力本文は保存せず、redaction後入力のSHA-256ハッシュ、redactionバージョン、入力スキーマバージョンを記録する。
 - 利用規約、プライバシーポリシー、委託先一覧、インシデント対応Runbookを準備する。
 
-状態: 未着手。
+状態: 設計依頼準備済み。`docs/fable5-design-request-batch6-external-delivery-2026-08-15.md`で、AI provenance、TOTP MFA/AAL2、custom SMTP、署名済みrelease pipeline、運用・法務境界の5サブバッチへ分割した。Fable 5の設計回答後、Codexがサブバッチ単位で実装する。production変更はまだ行っていない。
 
 ### Batch 3後の独立小タスク: テスト安定化と警告除去
 

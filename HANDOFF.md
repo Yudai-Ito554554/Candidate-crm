@@ -55,7 +55,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 
 ## 3. 現在作業中の内容
 
-**Fable 5レビュー対応Batch 1〜5、productionバックアップ・restore drill、M4テスト安定化、残Low hardeningは完了し、すべて`main`へ反映済み。Fable 5は残Low hardeningをApprove（Blocker・High・Mediumなし、任意Low 1件）し、実装CI Run `31808266181`と証跡CI Run `31809900804`はいずれも全3ジョブ成功。現在の次段階は、Windows実機UATを含むStage 3残項目または外部提供が現実化した時点のBatch 6。**
+**Fable 5レビュー対応Batch 1〜5、productionバックアップ・restore drill、M4テスト安定化、残Low hardeningは完了し、すべて`main`へ反映済み。Fable 5は残Low hardeningをApprove（Blocker・High・Mediumなし、任意Low 1件）し、実装CI Run `31808266181`と証跡CI Run `31809900804`はいずれも全3ジョブ成功。Batch 6は`docs/fable5-design-request-batch6-external-delivery-2026-08-15.md`として設計依頼を準備済み。次はFable 5の設計回答を受けてCodexがサブバッチ単位で実装するか、Windows実機を入手できた時点でStage 3 UATを進める。**
 
 - R1〜R3: JWTエミュレーション共通化、Storage遮断、SECURITY DEFINER関数のsuspended/pending拒否をpgTAPへ追加。
 - R4: 停止時は`suspended`化とSupabase Authのban・セッション失効を併用する運用をRunbookへ追加。
@@ -279,7 +279,7 @@ npm run supabase:stop
    - `docs/production-release-runbook.md` — 本番への実操作手順（実際にproductionを触る場合のみ）
    - `docs/rollback-runbook.md` — 配布後に問題が出た場合の切り戻し手順
 
-3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。外部顧客提供が現実的になった時点で、Batch 6（Pro/MFA/正式署名・Notarization/AI入力ハッシュ/法務文書）をFable 5設計レビューから開始する。
+3. **次にやるべきタスクの選び方**: 本HANDOFF.mdの4節「未完了の内容」と5節「次に実装すべき内容」を参照。Windows実機が利用可能なら**staging版UAT（S3-10）**を優先する。外部提供基盤は`docs/fable5-design-request-batch6-external-delivery-2026-08-15.md`をFable 5へ渡し、返却された設計をCodexが実装する。
 
 4. **作業前の安全確認（このプロジェクト特有のルール）**:
    - `.env.local`・`.env`はコミット対象外であることを都度確認（`git status --ignored`で`!!`表示になっているか）
