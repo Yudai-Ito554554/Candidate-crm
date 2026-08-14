@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   utimesSync,
@@ -93,6 +94,10 @@ describe("Candidate CRM backup script definitions", () => {
     expect(backupSource).toContain("SCRIPT_VERSION=2");
     expect(freshnessSource).toContain("172800");
     expect(freshnessSource).toContain("FRESHNESS_ERROR");
+    expect(freshnessSource).toContain("trap on_error ERR");
+    expect(freshnessSource).toContain("NOTIFICATION_MARKER");
+    expect(freshnessSource).toContain("% 86400");
+    expect(freshnessSource).toContain("% 3600");
     const freshnessPlistSource = readFileSync(freshnessPlist, "utf8");
     expect(freshnessPlistSource).toContain("<key>RunAtLoad</key>");
     expect(freshnessPlistSource).toContain("__FRESHNESS_SCRIPT__");
@@ -321,6 +326,41 @@ describe.skipIf(process.platform === "win32")(
       expect(readFileSync(join(backupRoot, "backup.log"), "utf8")).toContain(
         "FRESHNESS_ERROR latest completed backup is older than the allowed threshold",
       );
+    });
+
+    it("notifies once and renders the configured threshold in day-first units", async () => {
+      const root = await mkdtemp(
+        join(tmpdir(), "candidate-crm-freshness-notify-"),
+      );
+      const { pointer } = createFixture(root);
+      const fakeBin = join(root, "bin");
+      const notificationLog = join(root, "notifications.log");
+      mkdirSync(fakeBin);
+      writeFileSync(
+        join(fakeBin, "osascript"),
+        `#!/usr/bin/env bash
+printf '%s\\n' "$*" >>"$CANDIDATE_CRM_TEST_NOTIFICATION_LOG"
+cat >/dev/null
+`,
+      );
+      chmodSync(join(fakeBin, "osascript"), 0o700);
+
+      const result = spawnSync("/bin/bash", [freshnessScript], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+          CANDIDATE_CRM_BACKUP_CONFIG_POINTER: pointer,
+          CANDIDATE_CRM_BACKUP_MAX_AGE_SECONDS: "172800",
+          CANDIDATE_CRM_TEST_NOTIFICATION_LOG: notificationLog,
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(existsSync(notificationLog)).toBe(true);
+      expect(readFileSync(notificationLog, "utf8").trim().split("\n")).toEqual([
+        "- 2日",
+      ]);
     });
 
     it("keeps 14 daily generations and one generation from 8 ISO weeks", async () => {
