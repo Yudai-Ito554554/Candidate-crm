@@ -48,13 +48,24 @@ npx supabase test db
 24. プロフィール欠損時のロール変更がfail-closedで拒否され、同時実行でも最後のadminを降格できないことを確認する
 25. 新規profileが`pending`となり、承認前は自分のprofile以外のCRMデータを参照できないことを確認する
 26. 過去メールの初回取り込みでもスレッドの最終送信者・プレビュー・日時が更新されることを確認する
+27. AI provenanceの5列がall-or-nothingで、fingerprintが64桁小文字hexに限定され、列追加後もanon・authenticatedが両requestテーブルへアクセスできないことを確認する
 
 ## Edge Function secrets and deployment
 
-非本番project refを確認し、OpenAI APIキーだけをSupabase Secretへ設定します。レビュー済みモデルIDは各Edge Functionのサーバー側コードで固定し、`OPENAI_MODEL` SecretやVite環境変数では上書きしません。`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`はSupabase Edge Function環境から取得し、デスクトップアプリへコピーしません。
+非本番project refを確認し、OpenAI APIキーとAI provenance HMAC keyをSupabase Secretへ設定します。レビュー済みモデルIDは各Edge Functionのサーバー側コードで固定し、`OPENAI_MODEL` SecretやVite環境変数では上書きしません。`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`はSupabase Edge Function環境から取得し、デスクトップアプリへコピーしません。
+
+サーバー専用secretの一覧（名前のみ。値はこのリポジトリのどのファイルにも記録しません）:
+
+| Secret名                     | 用途                                                             |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `OPENAI_API_KEY`             | OpenAI Responses API認証                                         |
+| `AI_FINGERPRINT_HMAC_KEY_V1` | AI入力fingerprint（HMAC-SHA-256）の署名key。**削除しないこと。** |
+
+`AI_FINGERPRINT_HMAC_KEY_V1`が未設定または空の場合、AI候補者サマリーとAI求人取り込みはproviderへ送信せずエラー終了します（fail-closed）。運用ルール（削除禁止、rotationは加算のみ、漏洩時の不可逆性）は`docs/backup-runbook.md`の「AI provenance HMAC keyの運用」節が正本です。
 
 ```sh
 npx supabase secrets set OPENAI_API_KEY=<OPENAI_API_KEY>
+npx supabase secrets set AI_FINGERPRINT_HMAC_KEY_V1=<AI_FINGERPRINT_HMAC_KEY_V1>
 npx supabase functions deploy generate-candidate-summary
 npx supabase functions deploy extract-job-posting
 npx supabase functions deploy get-ai-usage

@@ -109,10 +109,15 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           error_code: string | null;
+          hash_algorithm: string | null;
+          hash_key_version: number | null;
           id: string;
+          input_fingerprint: string | null;
+          input_schema_version: string | null;
           input_tokens: number | null;
           output_tokens: number | null;
           provider_model: string | null;
+          redaction_version: string | null;
           requested_by: string | null;
           started_at: string | null;
           status: string;
@@ -122,10 +127,15 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           error_code?: string | null;
+          hash_algorithm?: string | null;
+          hash_key_version?: number | null;
           id?: string;
+          input_fingerprint?: string | null;
+          input_schema_version?: string | null;
           input_tokens?: number | null;
           output_tokens?: number | null;
           provider_model?: string | null;
+          redaction_version?: string | null;
           requested_by?: string | null;
           started_at?: string | null;
           status?: string;
@@ -135,10 +145,15 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           error_code?: string | null;
+          hash_algorithm?: string | null;
+          hash_key_version?: number | null;
           id?: string;
+          input_fingerprint?: string | null;
+          input_schema_version?: string | null;
           input_tokens?: number | null;
           output_tokens?: number | null;
           provider_model?: string | null;
+          redaction_version?: string | null;
           requested_by?: string | null;
           started_at?: string | null;
           status?: string;
@@ -1002,10 +1017,15 @@ export type Database = {
         Row: {
           completed_at: string | null;
           error_code: string | null;
+          hash_algorithm: string | null;
+          hash_key_version: number | null;
           id: string;
+          input_fingerprint: string | null;
+          input_schema_version: string | null;
           input_tokens: number | null;
           output_tokens: number | null;
           provider_model: string | null;
+          redaction_version: string | null;
           requested_by: string;
           source_type: string;
           started_at: string;
@@ -1014,10 +1034,15 @@ export type Database = {
         Insert: {
           completed_at?: string | null;
           error_code?: string | null;
+          hash_algorithm?: string | null;
+          hash_key_version?: number | null;
           id?: string;
+          input_fingerprint?: string | null;
+          input_schema_version?: string | null;
           input_tokens?: number | null;
           output_tokens?: number | null;
           provider_model?: string | null;
+          redaction_version?: string | null;
           requested_by: string;
           source_type: string;
           started_at?: string;
@@ -1026,10 +1051,15 @@ export type Database = {
         Update: {
           completed_at?: string | null;
           error_code?: string | null;
+          hash_algorithm?: string | null;
+          hash_key_version?: number | null;
           id?: string;
+          input_fingerprint?: string | null;
+          input_schema_version?: string | null;
           input_tokens?: number | null;
           output_tokens?: number | null;
           provider_model?: string | null;
+          redaction_version?: string | null;
           requested_by?: string;
           source_type?: string;
           started_at?: string;

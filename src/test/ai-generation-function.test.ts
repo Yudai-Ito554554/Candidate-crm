@@ -51,8 +51,11 @@ describe("candidate AI generation Edge Function", () => {
     expect(functionSource).toContain('type: "json_schema"');
     expect(functionSource).toContain("additionalproperties: false");
     expect(functionSource).toContain("provider_timeout_ms");
+    // Bumped in Batch 6A: canonical serialization changed the effective
+    // prompt (sorted keys, NFC, LF, null keys dropped), so provenance would
+    // be misleading if the version stayed at v2.
     expect(functionSource).toContain(
-      'const prompt_version = "candidate-summary-v2"',
+      'const prompt_version = "candidate-summary-v3"',
     );
     const schemaBody = functionSource.slice(
       functionSource.indexOf("function summaryschema"),
@@ -84,6 +87,40 @@ describe("candidate AI generation Edge Function", () => {
     expect(functionSource).toContain('replaceall(candidatename, "[候補者]")');
     expect(functionSource).toContain("[メールアドレス]");
     expect(functionSource).toContain("[電話番号]");
+  });
+
+  it("fingerprints the exact provider request body before dispatch", () => {
+    expect(functionSource).toContain(
+      'requiredsecret("ai_fingerprint_hmac_key_v1")',
+    );
+    // Two constants, not one, so changing redaction rules cannot silently
+    // move the input schema version with them.
+    expect(functionSource).toContain(
+      'const ai_redaction_version = "candidate-summary/1"',
+    );
+    expect(functionSource).toContain(
+      'const ai_input_schema_version = "candidate-summary/1"',
+    );
+    expect(functionSource).toContain(
+      "const ai_fingerprint_hmac_key_version = 1",
+    );
+    // The serialized string is both hashed and sent; a second
+    // JSON.stringify of the body would break that guarantee.
+    expect(functionSource).toContain("body: providerrequestbody");
+    const dispatchBody = functionSource.slice(
+      functionSource.indexOf("const providerrequestbody"),
+      functionSource.indexOf("if (!providerresponse.ok)"),
+    );
+    expect(dispatchBody).toContain("computehmacsha256fingerprint(");
+    expect(dispatchBody).toContain('hash_algorithm: "hmac-sha256"');
+    expect(dispatchBody).toContain("input_fingerprint: inputfingerprint");
+    expect(dispatchBody).toContain(
+      'if (provenanceerror) throw new error("provenance_record_failed")',
+    );
+    // Provenance is written before the provider call, not after.
+    expect(
+      dispatchBody.indexOf("input_fingerprint: inputfingerprint"),
+    ).toBeLessThan(dispatchBody.indexOf("body: providerrequestbody"));
   });
 
   it("guards concurrent requests and archives older summaries server-side", () => {
