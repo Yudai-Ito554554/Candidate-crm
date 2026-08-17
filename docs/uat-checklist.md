@@ -116,6 +116,7 @@
 - staging版とproduction版を共存させ、資格情報とログイン状態が混在しない
 - Windowsでインストール、起動、終了、再起動、アンインストールを確認する
 - Windows実機入手後、Credential Managerでログイン復元・ログアウト削除・staging/production分離を確認する（Batch 5のmainマージ条件外）
+  - ログイン復元・ログアウト削除は2026-08-17に確認済み。staging/production分離はWindows実機にproduction版が未インストールのため未実施。production版をWindowsへ導入する際に実施する。macOSでは2026-08-14に確認済みで、環境ごとのservice名分離は自動テストでも固定されている
 - 未署名QA版であることをテスターへ明示し、一般配布しない
 
 ### Batch 5 macOS実機確認記録（2026-08-14）
@@ -126,7 +127,21 @@
 - ✅ 本番版とSTAGING版を同時起動し、本番版をログアウトしてもSTAGING版がホーム画面のまま維持されることを確認
 - ✅ 旧STAGINGセッションから新ビルド初回起動時にホームへ復帰し、移行機能が動作することを機能上確認。localStorageの`sb-`キー消去は自動テストで固定
 - ☐ Keychainアクセスを明示的に拒否する実機操作は未実施。資格情報ストア拒否時に`null`を返し、平文fallbackせずクラッシュしない経路は自動テストで確認済み
-- ☐ Windows Credential Manager実機確認はWindows端末入手後に実施
+- ☑ Windows Credential Manager実機確認は2026-08-17に実施（下記「Batch 5 Windows実機確認記録」を参照）。staging/production分離のWindows実機確認のみ未実施
+
+### Batch 5 Windows実機確認記録（2026-08-17）
+
+使用ビルド: GitHub Actions「Desktop QA artifacts」Run `32002806871`（workflow_dispatch / branch `main` / headSha `0ec8419`）の未署名成果物 `candidate-crm-staging-windows-unsigned`。SHA-256は同梱manifestと一致（MSI `872b93ca…3ea62`、NSIS setup.exe `f4486769…a8ae4`）。
+
+- ✅ NSIS/MSIでインストール成功。アプリ名は`Candidate CRM STAGING`として本番版と別アプリで登録される
+- ✅ 起動成功、STAGINGバッジ表示を確認
+- ✅ ログイン後に完全終了・再起動し、再ログインなしでホームへ復帰（セッション復元）
+- ✅ ウィンドウ最小サイズ制約が効いており、規定サイズ以下へ縮小できずレイアウト崩れなし
+- ✅ 資格情報マネージャーの汎用資格情報に`supabase-refresh-token.com.candidatecrm.desktop.staging`が作成されることを確認
+- ✅ ログアウト後に同エントリが削除されることを確認
+- ✅ アンインストール成功
+- ⚠️ 初回起動時にSmartScreen警告が表示される。未署名QA版のため想定内（署名はS3-12で対応）
+- ☐ Windows実機でのstaging版とproduction版の共存・資格情報分離は未実施（macOSでは2026-08-14に確認済み）
 
 ## 8. 合格条件
 
