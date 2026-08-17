@@ -7,7 +7,7 @@
 - `main` HEAD: `0ec8419`（Batch 6A統合済み）
 - 直近CI: Run `32001523259`（`0ec8419`）全3ジョブ成功
 - production / staging への操作: **このセッションでは一切なし**
-- 中断地点: **Windows実機UAT（S3-10）のStep 1手前**。成果物はダウンロード・検証済みで、インストール操作から再開できる
+- 中断地点: **S3-3（viewerの直URLアクセス確認）の準備段階**。S3-10とBatch 5残UATは完了済み（下記「Windows実機UATの結果」）。次回はSupabaseダッシュボードのログイン情報の確認から再開する
 
 ## このセッションで完了したこと
 
@@ -48,9 +48,54 @@ Windows成果物を `C:\dev\qa-staging` へ展開済み。検証結果:
 
 **成果物の保持期限は2026-08-24（GitHub上のretention 7日）。** 期限後に再取得が必要なら同じworkflowを再実行する。ローカルの `C:\dev\qa-staging` は期限の影響を受けない。
 
-## 次回やること: S3-10 + Batch 5残UAT
+### 4. Windows実機UAT（S3-10 + Batch 5残UAT）の完了
 
-`docs/production-go-no-go-checklist.md` のS3-10（Windows実機でのインストール・起動・終了・再起動・アンインストール）と、`docs/uat-checklist.md` 7節のBatch 5残項目（Credential Manager）を同じビルドで消化する。Stage 3Aの最優先項目。
+Run `32002806871` の成果物で実施し、全項目成功。記録は `docs/uat-checklist.md`「Batch 5 Windows実機確認記録（2026-08-17）」と `docs/production-go-no-go-checklist.md` S3-10（`☒ 済`）。
+
+| 項目                          | 結果                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| SmartScreen警告               | 出た（未署名のため想定内、署名はS3-12）                                         |
+| インストール                  | 成功。アプリ名 `Candidate CRM STAGING` で本番版と別登録                         |
+| 起動                          | 成功。STAGINGバッジ表示                                                         |
+| セッション復元（終了→再起動） | 成功。再ログインなしでホームへ復帰                                              |
+| ウィンドウ最小サイズ制約      | 成功。規定サイズ以下へ縮小できずレイアウト崩れなし                              |
+| 資格情報マネージャー          | 汎用資格情報に `supabase-refresh-token.com.candidatecrm.desktop.staging` を確認 |
+| ログアウト後                  | 同エントリの削除を確認                                                          |
+| アンインストール              | 成功                                                                            |
+
+**未実施として残したもの**: Windows実機でのstaging版とproduction版の共存・資格情報分離。Windows実機にproduction版が未インストールのため。production版をWindowsへ導入する際に実施する。macOSでは2026-08-14に確認済みで、環境ごとのservice名分離は自動テストでも固定されている。
+
+なお、UATに使ったビルドの manifest `sourceRevision` は `0ec8419` で、実施時点の `main` HEAD `cdeb513` とは一致しなかった。差分は `git diff --name-only 0ec8419..cdeb513` の結果が `HANDOFF.md` と `docs/development-handoff-2026-08-17.md` の2件のみ（全パスが `docs/` または `*.md`）であることをコマンドで確認し、ビルド成果物へ影響しないと判定して再ビルドせずに実施した。判定根拠はS3-10欄に記録済み。
+
+## 次回やること: S3-3（viewerの直URLアクセス確認）
+
+**まずSupabaseダッシュボードのログイン情報を確認するところから始める。** stagingのproject ref・publishable keyの取得と、viewerテストユーザー（`uat-viewer@example-uat.invalid`）のパスワード確認の両方に必要で、ここが揃わないと先へ進めない。テストユーザーのパスワードはリポジトリのどのファイルにも記録されていない（`HANDOFF.md` 12節）。
+
+### 手順
+
+1. **Supabaseダッシュボードへログイン**し、staging プロジェクト（ref `admjgbfrfoczpxdtxmgy`、**productionの `dsaqarejqslzgcatkxeh` と間違えない**）の Settings > API から Project URL と publishable key を取得する
+2. **`.env` を staging 向けに設定**する。`.env` は現在3変数とも空。`.env.example` の雛形どおり:
+
+   ```
+   VITE_APP_ENV=staging
+   VITE_SUPABASE_URL=https://admjgbfrfoczpxdtxmgy.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=<stagingのpublishable key>
+   ```
+
+   **`VITE_APP_ENV=staging` を忘れないこと。** `src/lib/env.ts` で未設定時は `production` にフォールバックするため、書き忘れるとstaging Supabaseに接続しながらproduction扱いで動作し、STAGINGバッジも出ない。`.env` を変更したらdev serverの再起動が必要（HMRでは反映されない）
+
+3. **`npm run dev` でweb版を起動**（http://localhost:1420/ ）。Fable 5の判断どおり、S3-3の合格証跡はTauriアプリではなくブラウザで取る（Tauriにはアドレスバーがないため）。テスト専用deep-linkは実装しない
+4. **viewerアカウントでログイン**し、URLバーから編集6ルート（候補者・求人・企業の新規/編集）を直打ちして、編集画面が開けないことを確認する
+5. 結果を `docs/production-go-no-go-checklist.md` のS3-3へ記録する
+
+### 注意
+
+- `.env` はコミット対象外。`git status --ignored` で `!!` 表示になっていることを確認する
+- viewerテストユーザーのパスワードをチャットやリポジトリへ出さない
+
+## 完了済み: S3-10 + Batch 5残UAT（記録として残す）
+
+2026-08-17に実施し完了（結果は上記「4. Windows実機UAT（S3-10 + Batch 5残UAT）の完了」）。以下は実施時の手順・観点で、production版のWindows導入時に共存確認をやり直す際の参照用に残す。
 
 ### 分担
 
@@ -65,7 +110,7 @@ GUI操作は人が行う。**Credential Managerの検証はClaudeが機械的に
 
 保存されるのは refresh token のみ。Rust側で `supabase-refresh-token` 以外のキーは `credential_key_not_allowed` で拒否される。access tokenとユーザー情報はメモリのみ。
 
-**2026-08-17時点のベースラインはクリーン**（`cmdkey /list` に `candidatecrm` 関連エントリなし）。これは「ログイン後に作られたこと」を示す出発点になるので、再開時にまず再確認する。
+UAT開始時点のベースラインはクリーンだった（`cmdkey /list` に `candidatecrm` 関連エントリなし）。この出発点があるため、ログイン後にstagingエントリが作られたことを確認できた。
 
 ```powershell
 $out = cmdkey /list | Out-String

@@ -53,13 +53,22 @@ async function collectTextFiles(directory) {
 }
 
 async function verifyEnvironmentExample() {
-  const expected = "VITE_SUPABASE_URL=\nVITE_SUPABASE_PUBLISHABLE_KEY=\n";
+  // VITE_APP_ENV は秘密情報ではなく、未設定時に production へフォールバックする
+  // （src/lib/env.ts）ため、staging QA時の設定漏れを防ぐ目的で雛形へ明示している。
+  // 秘密情報を持つ2変数は引き続き空値でなければならない。
+  const expected =
+    "# production | staging（未設定時は production）。staging QA版では staging を明示する\n" +
+    "VITE_APP_ENV=production\n" +
+    "VITE_SUPABASE_URL=\n" +
+    "VITE_SUPABASE_PUBLISHABLE_KEY=\n";
   const actual = (
     await readFile(path.join(repositoryRoot, ".env.example"), "utf8")
   ).replaceAll("\r\n", "\n");
 
   if (actual !== expected) {
-    errors.push(".env.example は公開可能な2変数だけを空値で定義してください。");
+    errors.push(
+      ".env.example は VITE_APP_ENV=production と、公開可能な2変数の空値だけを定義してください。",
+    );
   }
 }
 
