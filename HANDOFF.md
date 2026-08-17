@@ -84,7 +84,7 @@ Fable 5の横断判断で決まった重要事項:
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
 - **Stage 3（外部顧客への一般提供）判定**: 14項目中、Go/No-Go未記入。多くの重大項目が未着手（詳細は4節）。
-- **社内試験運用のWindows展開**: 次の最優先事項としてドキュメント上で明言されているが、Windows実機自体がまだない状態。
+- **社内試験運用のWindows展開**: 最優先事項。2026-08-17時点で**Windows実機（開発機がWindows 11）とQA成果物が揃い、着手可能な状態**になった。staging QA成果物はDesktop QA artifacts Run `32002806871`（HEAD `0ec8419`）でビルドし、`C:\dev\qa-staging`へ展開・SHA256照合済み。インストール操作から再開できる。手順と分担は`docs/development-handoff-2026-08-17.md`を参照。GitHub上の成果物retentionは2026-08-24まで。
 
 ---
 
@@ -183,7 +183,8 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 - `docs/production-go-no-go-checklist.md`（新規、Stage 1〜3判定表。**現在の正式な進捗管理表、必ずこれを見ること**）
 - `docs/uat-checklist.md`（新規、業務受け入れテスト観点。CSV取り込み関連観点を追加済み）
 - `docs/rollback-runbook.md`（新規、配布後の切り戻し手順）
-- `docs/development-handoff-2026-08-11.md`（前回セッションの詳細な作業ログ。本HANDOFF.mdより粒度が細かい時系列記録）
+- `docs/development-handoff-2026-08-17.md`（**最新セッションのチェックポイント。中断地点と次回の再開手順はここが最も具体的**）
+- `docs/development-handoff-2026-08-11.md`（過去セッションの詳細な作業ログ）
 - `README.md`（各Phaseの実装記録、セットアップ手順、品質チェック手順を随時追記）
 
 ---
@@ -280,7 +281,8 @@ npm run supabase:stop
    - `AGENTS.md` — プロジェクトルール全体
    - `docs/production-go-no-go-checklist.md` — 本番移行の正式な進捗表（Stage 1/2はGo、Stage 3は未判定）
    - このファイル（`HANDOFF.md`）
-   - `docs/development-handoff-2026-08-11.md` — より詳細な時系列ログ（本ファイルの元ネタ、粒度が細かい）
+   - `docs/development-handoff-2026-08-17.md` — **最新セッションの中断地点と再開手順（Windows実機UATの途中から再開する場合はまずこれ）**
+   - `docs/development-handoff-2026-08-11.md` — より詳細な時系列ログ（粒度が細かい）
    - `docs/fable5-review-action-plan-2026-08-11.md` — Fable 5指摘の採否、実装順、production適用条件
    - `docs/fable5-review-batch1-result-2026-08-12.md` — Batch 1承認結果とBatch 2設計指針
    - `docs/fable5-review-request-batch3-2026-08-13.md` — Batch 3の実装範囲、検証HEAD、CI証跡、Fable 5レビュー論点
