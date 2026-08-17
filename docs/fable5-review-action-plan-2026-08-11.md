@@ -123,7 +123,22 @@
 - AI入力本文は保存せず、redaction後入力のSHA-256ハッシュ、redactionバージョン、入力スキーマバージョンを記録する。
 - 利用規約、プライバシーポリシー、委託先一覧、インシデント対応Runbookを準備する。
 
-状態: 設計依頼準備済み。`docs/fable5-design-request-batch6-external-delivery-2026-08-15.md`で、AI provenance、TOTP MFA/AAL2、custom SMTP、署名済みrelease pipeline、運用・法務境界の5サブバッチへ分割した。Fable 5の設計回答後、Codexがサブバッチ単位で実装する。production変更はまだ行っていない。
+状態: 6Aのみ完了、6B〜6Eは未着手。`docs/fable5-design-request-batch6-external-delivery-2026-08-15.md`で、AI provenance、TOTP MFA/AAL2、custom SMTP、署名済みrelease pipeline、運用・法務境界の5サブバッチへ分割した。Fable 5は`docs/fable5-design-batch6a-and-cross-cutting-2026-08-15.md`で横断判断と6Aの設計を回答済み。production変更はまだ行っていない。
+
+#### Batch 6A: AI入力provenance — 完了・`main`反映済み
+
+設計正本は上記設計書の2節。AIへ送信した本文を保存せず、送信直前のcanonical serialization済み文字列（＝実際に送るバイト列そのもの）のHMAC-SHA-256を記録する。raw SHA-256を採らなかったのは、DBダンプ漏洩時にfingerprintが「この原文をAIへ送ったか」を突合できる確認オラクルになるため。keyはEdge Function secretsの`AI_FINGERPRINT_HMAC_KEY_V1`にのみ置く。
+
+- 共有モジュール`supabase/functions/_shared/ai-provenance.ts`（`7b3cd30`）。NFC、CRLF/CR→LF、キーのコードポイント昇順、配列順序保持、null/undefinedキー除去、非有限数・循環参照でエラー。**返した文字列をそのままprovider APIのbodyへ渡す**ため、ハッシュ対象と送信物が構造的に一致する。
+- migration `20260817030000_ai_provenance_columns.sql`（`d1daaad`）。`ai_generation_requests`と`job_import_requests`へ5列、形式check、all-or-nothing制約。backfillなし。列追加後もanon/authenticatedが到達できないことをpgTAP `006`（12 assertion）で再固定。
+- Edge Function 2本（`43ec627`）。provider送信の直前に5列をUPDATEし、HMAC key未設定・空、canonical serialization失敗、provenance UPDATE失敗の3経路で送信せずエラー終了する。cache hitはクライアント側キャッシュで関数に到達しないため5列はNULLのまま。
+- M-1対応（`4591c7b`）: canonical serialization採用でproviderへ渡るプロンプトの実体が変化したため、`PROMPT_VERSION`を`candidate-summary-v3`へ引き上げた（候補者サマリーはキー順ソート・NFC・LF・null項目除去、求人取り込みは原文のNFC・CRLF→LF）。Low-1対応として`redaction_version`と`input_schema_version`を別定数へ分離した。
+
+状態: Fable 5は`7b3cd30..b4771aa`をApprove（Blocker・Highなし、M-1・Low-1は対応済み）。`main`へ`--no-ff`マージ済み（`13218e7`）。マージ後のCI Run `31996043655`はmacOS・Windows・Supabaseの全3ジョブ成功。Vitest 74ファイル・413件、pgTAP 82 assertion。
+
+**未実施（オーナー作業、設計書2.12節が正本）**: (1) staging・production双方のsecretsへ`AI_FINGERPRINT_HMAC_KEY_V1`を設定（**両環境で別々の値**にする。同値だとstaging漏洩でproductionのfingerprintが突合可能になる）、(2) migration適用→Edge Function deployの順で実施（列がないとprovenance UPDATEが失敗して送信されない）、(3) stagingで両機能を各1回実行し5列の形式・同一入力の同一fingerprint・**AI出力が従来と大きく変わっていないことの目視確認**、(4) key一時除去によるfail-closed実証。3が全て通ってからproduction適用。
+
+**keyは削除しない。** 削除すると過去記録が検証不能になる。rotationは加算のみで旧keyをsecretsから消さない。運用ルールは`docs/backup-runbook.md`の「AI provenance HMAC keyの運用」節が正本。
 
 ### Batch 3後の独立小タスク: テスト安定化と警告除去
 
