@@ -12,12 +12,20 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PROMPT_VERSION = "candidate-summary-v2";
+// v3 (Batch 6A): the prompt context is now canonical-serialized rather than
+// passed through JSON.stringify, so the model receives object keys in sorted
+// order, NFC-normalized text with LF line endings, and no keys whose value is
+// null. Output wording can therefore differ from v2 even for identical
+// candidate data, which is why this version moves with the change.
+const PROMPT_VERSION = "candidate-summary-v3";
 const OPENAI_MODEL = "gpt-5.6-luna";
 const PROVIDER_TIMEOUT_MS = 60 * 1000;
-// Namespaced so the redaction rules and canonical-serialization schema for
-// candidate summaries can be versioned independently of job import.
-const AI_PROVENANCE_VERSION = "candidate-summary/1";
+// Namespaced so candidate-summary versions never collide with job-import ones.
+// These two advance independently: changing what is redacted moves only
+// AI_REDACTION_VERSION, and changing the serialized input shape moves only
+// AI_INPUT_SCHEMA_VERSION. They share a value today purely by coincidence.
+const AI_REDACTION_VERSION = "candidate-summary/1";
+const AI_INPUT_SCHEMA_VERSION = "candidate-summary/1";
 const AI_FINGERPRINT_HMAC_KEY_VERSION = 1;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -665,8 +673,8 @@ Deno.serve(async (request) => {
         input_fingerprint: inputFingerprint,
         hash_algorithm: "hmac-sha256",
         hash_key_version: AI_FINGERPRINT_HMAC_KEY_VERSION,
-        redaction_version: AI_PROVENANCE_VERSION,
-        input_schema_version: AI_PROVENANCE_VERSION,
+        redaction_version: AI_REDACTION_VERSION,
+        input_schema_version: AI_INPUT_SCHEMA_VERSION,
       })
       .eq("id", generationRequestId);
     if (provenanceError) throw new Error("provenance_record_failed");

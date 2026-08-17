@@ -132,8 +132,13 @@ describe("job posting extraction Edge Function", () => {
     expect(functionSource).toContain(
       'requiredsecret("ai_fingerprint_hmac_key_v1")',
     );
+    // Two constants, not one, so changing redaction rules cannot silently
+    // move the input schema version with them.
     expect(functionSource).toContain(
-      'const ai_provenance_version = "job-import/1"',
+      'const ai_redaction_version = "job-import/1"',
+    );
+    expect(functionSource).toContain(
+      'const ai_input_schema_version = "job-import/1"',
     );
     expect(functionSource).toContain(
       "const ai_fingerprint_hmac_key_version = 1",

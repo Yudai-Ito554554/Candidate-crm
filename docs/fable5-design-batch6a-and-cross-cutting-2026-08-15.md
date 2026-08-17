@@ -228,6 +228,7 @@ Vitest/Deno:
 1. ローカルクリーンDBで全migration成功、pgTAP全件成功。
 2. HMAC key(v1)がstaging・production双方のEdge Function secretsへ設定済み(値は記録しない)。
 3. stagingで実際にAI候補者サマリーとAI求人取り込みを1回ずつ実行し、5列が期待形式で記録されること、同一入力の再実行で同一fingerprintになることを確認。
+   - **(Batch 6Aレビューで追加)** 同じ実行で、AI出力の内容が従来と大きく変わっていないことを目視確認する。canonical serializationの採用により、providerへ渡るプロンプトの実体が変化しているため(候補者サマリーはキー順ソート・NFC・LF・null項目の除去、求人取り込みは原文のNFC・CRLF→LF正規化)。候補者サマリーの`PROMPT_VERSION`は`candidate-summary-v3`へ引き上げ済み。
 4. key未設定状態でのfail-closed動作をstagingで1回実証(一時的にkeyを外して実行し、送信されないことを確認。確認後に戻す)。
 5. runbookへ「AI provenance keyは削除しない」「key漏洩時の扱い」を追記済み。
 6. 既存Runbookのproduction適用条件(バックアップ、dry-run、Go/No-Go記録)を満たす。

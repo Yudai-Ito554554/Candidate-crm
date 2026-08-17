@@ -1,9 +1,9 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
 最終更新: 2026-08-17（Asia/Tokyo）
-基準: `main`は`c34a9b6`。Batch 6Aはブランチ`fable5-ai-provenance-batch6a`（`main`未マージ、Fable 5レビュー前）
+基準: `main`は`c34a9b6`。Batch 6Aはブランチ`fable5-ai-provenance-batch6a`（`main`未マージ、Fable 5レビュー済み・M-1/Low-1対応済み）
 
-このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1〜Batch 5、M4テスト安定化、残Low hardeningは`main`へ反映済みです。残Low実装HEAD `f840963`のCI Run `31808266181`と証跡HEAD `b361ee9`のCI Run `31809900804`は、いずれもmacOS・Windows・Supabase全3ジョブが成功しています。Batch 6A（AI入力provenance）は実装を終えていますが、レビューと`main`マージが未了です。
+このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1〜Batch 5、M4テスト安定化、残Low hardeningは`main`へ反映済みです。残Low実装HEAD `f840963`のCI Run `31808266181`と証跡HEAD `b361ee9`のCI Run `31809900804`は、いずれもmacOS・Windows・Supabase全3ジョブが成功しています。Batch 6A（AI入力provenance）はFable 5がApprove with recommendations（Blocker・Highなし、Medium 1件・Low 1件）を出し、指摘への対応も完了していますが、`main`マージが未了です。
 
 ---
 
@@ -51,7 +51,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 15. **M4テスト安定化とRouter警告除去**（`main`反映済み）: Vitestの多数のjsdomファイルを並列実行した際のCPU・メモリ競合が、正常な非同期UI待機を5秒超へ押し出す主因と特定した。テストworkerを1本へ固定し、全体検索テストではクリック検証に不要な合成hoverを省略した。初期lazy routeへ`hydrateFallbackElement`を補完し、React Router警告を除去した。全体検索テストは10回連続成功、全体は69ファイル・365件成功、HydrateFallback警告0件を確認済み。Fable 5は条件付きApproveし、将来はworker競合を戻さず重いjsdom suiteを分離する方針を`vite.config.ts`へ記録した（`7892d64`）。
 16. **残Low hardeningの実装・CI検証**（マージcommit `9d49471`）: Batch 3のpgTAP診断分割（`40b3289`）、招待RPCのpending限定（`af8a6cb`）、trigger-only関数の直接EXECUTE権限整理（`130022e`）、freshness通知の一時マーカー・ERR補助trap・動的閾値表示（`39b5232`）を、Fable 5承認済み設計どおり実装した。fixture修正後の実装検証HEADは`f840963`、CI Run `31808266181`はmacOS・Windows・Supabaseの全3ジョブ成功。Fable 5の実装後レビューでApproveされ、`main`へ統合した。production / staging操作は行っていない。
 
-17. **Fable 5レビュー対応Batch 6A（AI入力provenance）の実装**（ブランチ`fable5-ai-provenance-batch6a`、`main`未マージ）: AIへ送信した本文を保存せずに同一入力性とredaction規則の版を後から機械的に識別できるようにした。設計正本は`docs/fable5-design-batch6a-and-cross-cutting-2026-08-15.md`の2節。共有モジュール`supabase/functions/_shared/ai-provenance.ts`でcanonical serialization（NFC・CRLF→LF・キーのコードポイント昇順・null/undefinedキー除去・NaN/Infinity/循環参照でエラー）とHMAC-SHA-256を実装し、**生成した文字列をそのままprovider APIのbodyに使う**ことで「送ったもの」と「ハッシュしたもの」の乖離を構造的に排除した。raw SHA-256ではなくHMACを採用した理由は、DBダンプ漏洩時にfingerprintが確認オラクル化することを防ぐため（keyはEdge Function secretsのみ）。migration `20260817030000_ai_provenance_columns.sql`で`ai_generation_requests`と`job_import_requests`へ5列（`input_fingerprint`/`hash_algorithm`/`hash_key_version`/`redaction_version`/`input_schema_version`）とall-or-nothing制約を追加。Edge Function 2本はprovider送信の直前に5列をUPDATEし、HMAC key未設定・serialization失敗・UPDATE失敗の3経路でproviderへ送信せずエラー終了する。**2026-08-15以前に作成された既存行は5列すべてNULLであり、原文が存在しないためbackfillしない。**
+17. **Fable 5レビュー対応Batch 6A（AI入力provenance）の実装**（ブランチ`fable5-ai-provenance-batch6a`、`main`未マージ）: AIへ送信した本文を保存せずに同一入力性とredaction規則の版を後から機械的に識別できるようにした。設計正本は`docs/fable5-design-batch6a-and-cross-cutting-2026-08-15.md`の2節。共有モジュール`supabase/functions/_shared/ai-provenance.ts`でcanonical serialization（NFC・CRLF→LF・キーのコードポイント昇順・null/undefinedキー除去・NaN/Infinity/循環参照でエラー）とHMAC-SHA-256を実装し、**生成した文字列をそのままprovider APIのbodyに使う**ことで「送ったもの」と「ハッシュしたもの」の乖離を構造的に排除した。raw SHA-256ではなくHMACを採用した理由は、DBダンプ漏洩時にfingerprintが確認オラクル化することを防ぐため（keyはEdge Function secretsのみ）。migration `20260817030000_ai_provenance_columns.sql`で`ai_generation_requests`と`job_import_requests`へ5列（`input_fingerprint`/`hash_algorithm`/`hash_key_version`/`redaction_version`/`input_schema_version`）とall-or-nothing制約を追加。Edge Function 2本はprovider送信の直前に5列をUPDATEし、HMAC key未設定・serialization失敗・UPDATE失敗の3経路でproviderへ送信せずエラー終了する。**2026-08-15以前に作成された既存行は5列すべてNULLであり、原文が存在しないためbackfillしない。** Fable 5レビューのM-1指摘により、canonical serialization採用でproviderへ渡るプロンプトの実体が変化していること（候補者サマリーはキー順ソート・NFC・LF・null項目の除去、求人取り込みは原文のNFC・CRLF→LF）を受けて`PROMPT_VERSION`を`candidate-summary-v3`へ引き上げた。Low-1指摘により`redaction_version`と`input_schema_version`を別定数に分離し、片方だけを進められるようにした。
 
 ---
 
@@ -59,7 +59,7 @@ Candidate CRM は、人材紹介・採用エージェンシー業務向けの Ta
 
 **Fable 5レビュー対応Batch 1〜5、productionバックアップ・restore drill、M4テスト安定化、残Low hardeningは完了し、すべて`main`へ反映済み。Fable 5は残Low hardeningをApprove（Blocker・High・Mediumなし、任意Low 1件）し、実装CI Run `31808266181`と証跡CI Run `31809900804`はいずれも全3ジョブ成功。**
 
-**Batch 6はFable 5が横断判断とBatch 6Aの設計を`docs/fable5-design-batch6a-and-cross-cutting-2026-08-15.md`として回答済み。Batch 6A（AI入力provenance）はブランチ`fable5-ai-provenance-batch6a`で実装済みだがFable 5レビュー前・`main`未マージ。6B〜6Eは外部契約（SMTP事業者、署名手段、Pro移行）の確定待ちで、同文書3節の起動条件が満たされた時点で個別に設計依頼する。**
+**Batch 6はFable 5が横断判断とBatch 6Aの設計を`docs/fable5-design-batch6a-and-cross-cutting-2026-08-15.md`として回答済み。Batch 6A（AI入力provenance）はブランチ`fable5-ai-provenance-batch6a`で実装しFable 5がApprove with recommendations。M-1（実効プロンプトの変化）とLow-1（version定数の分離）へ対応済みで、`main`マージ待ち。6B〜6Eは外部契約（SMTP事業者、署名手段、Pro移行）の確定待ちで、同文書3節の起動条件が満たされた時点で個別に設計依頼する。**
 
 Fable 5の横断判断で決まった重要事項:
 
@@ -79,7 +79,7 @@ Fable 5の横断判断で決まった重要事項:
 - production初回バックアップ、launchd日次登録、48時間freshness監視、初回restore drillは2026-08-14に完了した。翌2026-08-15の02:30定刻ジョブも自動起動し、02:39に完了snapshotを作成して終了コード0となったことを確認済み。restore drillではproductionへ書き込まず、使い捨てローカル環境でDB件数・Storage件数・Auth・主要参照APIを確認し、完了後に隔離リソースを削除した。
 - M4: 高並列jsdom実行によるホスト資源競合を再現し、`vite.config.ts`でテストworkerを1本へ固定した。全体検索テストは不要なhoverイベントを省略し、Routerの初期lazy routeには適切なfallbackを追加した。全体検索10回連続と全365件で成功し、HydrateFallback警告が出ないことを確認した。Fable 5の条件付きApproveを反映し、将来のテスト増加時はworker競合を戻さず重いjsdom suiteを分離する方針を追記した。
 - 残Low hardening: Fable 5は実装後レビューでApprove（Blocker・High・Mediumなし）。`main`へ`--no-ff`マージ済み（`9d49471`）。実装検証HEAD `f840963`のCI Run `31808266181`と証跡HEAD `b361ee9`のCI Run `31809900804`は全3ジョブ成功。任意Lowとして、freshnessスクリプトの`mktemp -d`失敗はtrap設定前のため通知されないが、到達確率が極めて低く、現時点では対応不要と判断された。
-- Batch 6A: ブランチ`fable5-ai-provenance-batch6a`で実装済み、Fable 5レビュー前・`main`未マージ。**オーナー作業として未実施のものが4件残る**: (1) staging・production双方のEdge Function secretsへ`AI_FINGERPRINT_HMAC_KEY_V1`を設定、(2) Edge Function 2本のdeploy、(3) stagingでAI候補者サマリーとAI求人取り込みを1回ずつ実行して5列の記録形式と同一入力の再現性を確認、(4) key未設定状態でのfail-closed動作をstagingで1回実証（確認後にkeyを戻す）。production適用条件は設計書2.12節が正本。
+- Batch 6A: ブランチ`fable5-ai-provenance-batch6a`で実装、Fable 5はApprove with recommendations（Blocker・Highなし）。M-1（Medium、実効プロンプトの変化）とLow-1（version定数の分離）は対応済み。レビュー結果と対応の記録は`docs/fable5-review-request-batch6a-2026-08-17.md`の8節。**オーナー作業として未実施のものが4件残る**: (1) staging・production双方のEdge Function secretsへ`AI_FINGERPRINT_HMAC_KEY_V1`を設定（十分な長さのランダム値、値は記録しない）、(2) Edge Function 2本のdeploy、(3) stagingでAI候補者サマリーとAI求人取り込みを1回ずつ実行して5列の記録形式と同一入力の再現性を確認し、**あわせてAI出力の内容が従来と大きく変わっていないことを目視確認**、(4) key未設定状態でのfail-closed動作をstagingで1回実証（確認後にkeyを戻す）。production適用条件は設計書2.12節が正本。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
@@ -114,7 +114,7 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 
 ## 5. 次に実装すべき内容（優先順位順、ドキュメント上の合意事項）
 
-1. **Batch 6AのFable 5レビューと`main`マージ**: ブランチ`fable5-ai-provenance-batch6a`をレビューへ出し、承認後に`--no-ff`マージする。
+1. **Batch 6Aの`main`マージ**: Fable 5のApprove with recommendationsとM-1/Low-1対応が完了しているため、ブランチ`fable5-ai-provenance-batch6a`を`--no-ff`マージする。
 2. **Windows実機でのstaging版UAT**（`docs/uat-checklist.md`に沿って）: インストール・起動・終了・再起動・アンインストール（S3-10）。社内の他利用者はWindowsを使うため最優先。Stage 3A（社内Windows展開）の中心項目。
 3. **S3-3の実施**: Fable 5の回答どおり、stagingへ向けたweb buildをブラウザで起動し、viewerアカウントでURLバーから編集6ルートを直打ちして確認する。テスト専用deep-linkは実装しない。
 4. **S3-7の企業・求人アーカイブ/復元の実地確認**（候補者は完了済み）。

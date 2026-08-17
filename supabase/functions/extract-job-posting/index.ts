@@ -13,9 +13,12 @@ const CORS_HEADERS = {
 };
 
 const OPENAI_MODEL = "gpt-5.6-luna";
-// Namespaced so job-import redaction and schema versions move independently
-// of the candidate summary function.
-const AI_PROVENANCE_VERSION = "job-import/1";
+// Namespaced so job-import versions never collide with candidate-summary ones.
+// These two advance independently: changing what is redacted moves only
+// AI_REDACTION_VERSION, and changing the serialized input shape moves only
+// AI_INPUT_SCHEMA_VERSION. They share a value today purely by coincidence.
+const AI_REDACTION_VERSION = "job-import/1";
+const AI_INPUT_SCHEMA_VERSION = "job-import/1";
 const AI_FINGERPRINT_HMAC_KEY_VERSION = 1;
 const MAX_TEXT_LENGTH = 30_000;
 const MAX_PDF_BYTES = 5 * 1024 * 1024;
@@ -834,8 +837,8 @@ Deno.serve(async (request) => {
         input_fingerprint: inputFingerprint,
         hash_algorithm: "hmac-sha256",
         hash_key_version: AI_FINGERPRINT_HMAC_KEY_VERSION,
-        redaction_version: AI_PROVENANCE_VERSION,
-        input_schema_version: AI_PROVENANCE_VERSION,
+        redaction_version: AI_REDACTION_VERSION,
+        input_schema_version: AI_INPUT_SCHEMA_VERSION,
       })
       .eq("id", importRequestId);
     if (provenanceError) throw new Error("provenance_record_failed");

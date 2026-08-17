@@ -51,8 +51,11 @@ describe("candidate AI generation Edge Function", () => {
     expect(functionSource).toContain('type: "json_schema"');
     expect(functionSource).toContain("additionalproperties: false");
     expect(functionSource).toContain("provider_timeout_ms");
+    // Bumped in Batch 6A: canonical serialization changed the effective
+    // prompt (sorted keys, NFC, LF, null keys dropped), so provenance would
+    // be misleading if the version stayed at v2.
     expect(functionSource).toContain(
-      'const prompt_version = "candidate-summary-v2"',
+      'const prompt_version = "candidate-summary-v3"',
     );
     const schemaBody = functionSource.slice(
       functionSource.indexOf("function summaryschema"),
@@ -90,8 +93,13 @@ describe("candidate AI generation Edge Function", () => {
     expect(functionSource).toContain(
       'requiredsecret("ai_fingerprint_hmac_key_v1")',
     );
+    // Two constants, not one, so changing redaction rules cannot silently
+    // move the input schema version with them.
     expect(functionSource).toContain(
-      'const ai_provenance_version = "candidate-summary/1"',
+      'const ai_redaction_version = "candidate-summary/1"',
+    );
+    expect(functionSource).toContain(
+      'const ai_input_schema_version = "candidate-summary/1"',
     );
     expect(functionSource).toContain(
       "const ai_fingerprint_hmac_key_version = 1",

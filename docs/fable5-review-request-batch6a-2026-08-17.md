@@ -5,13 +5,15 @@
 - Implementation role: Codex
 - Branch: `fable5-ai-provenance-batch6a`
 - Base: `main` at `c34a9b6a0184c42d28294f2df9b24a56bf7cd182`
-- Implementation review HEAD: `8df59ab89cbfc8631f975a89e72d2eb4311700ff`
-- GitHub Actions Run ID: `31992846913`
-- GitHub Actions result: all 3 jobs passed
-- GitHub Actions URL:
-  https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31992846913
+- Initial review HEAD: `8df59ab89cbfc8631f975a89e72d2eb4311700ff`
+  (Run `31992846913`, all 3 jobs passed)
+- Review outcome: Approve with recommendations (no Blocker, no High;
+  M-1 Medium, Low-1)
 - Production/staging operations: none
 - Edge Function deployments: none
+
+M-1 and Low-1 are addressed in this branch; see sections 3 and 5. The
+post-review HEAD and its CI run are recorded in section 8.
 
 ## 1. Review objective
 
@@ -84,7 +86,10 @@ evidence of what was sent.
 
 Version values are domain-namespaced: `candidate-summary/1` and `job-import/1`,
 so one function's redaction rules can change without moving the other's
-version.
+version. Following review finding Low-1, each function holds
+`AI_REDACTION_VERSION` and `AI_INPUT_SCHEMA_VERSION` as two separate constants
+rather than one shared value, so changing what is redacted cannot silently
+advance the input schema version with it.
 
 ### Fail-closed behavior (design 2.9)
 
@@ -142,8 +147,33 @@ provenance is written exactly once per dispatch.
 
 ## 5. Deviations and judgement calls
 
-No deviation from the design. Two points where the instruction admitted more
-than one placement:
+No deviation from the design. Three points, the first of which was missed in
+the original submission and added after the Batch 6A review:
+
+0. **The effective prompt changed (review finding M-1, Medium).** This section
+   originally claimed no behavior change, which was wrong. Adopting canonical
+   serialization altered what the provider actually receives:
+
+   - `generate-candidate-summary`: the inner `input` string moved from
+     `JSON.stringify(promptContext)` to `canonicalSerialize(promptContext)`,
+     so object keys arrive sorted, text is NFC-normalized with LF line
+     endings, and **keys whose value is `null` are dropped entirely**. Model
+     output can differ from v2 for identical candidate data.
+   - `extract-job-posting`: the inner value stays a string, but the source
+     text now passes through NFC normalization and CRLF/CR to LF conversion.
+     The change is far smaller than above, but it is not zero.
+
+   Resolution: option (a) from the review. `PROMPT_VERSION` moves to
+   `candidate-summary-v3` with a comment recording what changed and why,
+   so provenance cannot show a stable prompt version across a changed
+   effective prompt. Option (b) — keeping `JSON.stringify` inside and making
+   only the outer body canonical — was rejected because the inner string
+   would then depend on PostgREST column ordering, and identical candidate
+   data could produce different fingerprints, weakening design 2.1's goal of
+   identifying that the same input was sent.
+
+   Go/No-Go item 3 in design 2.12 now carries an added visual check that AI
+   output has not changed substantially.
 
 1. **Secret name documentation.** The Codex instructions offered
    `.env.example` or the secrets documentation. `scripts/verify-repository.mjs`
@@ -195,3 +225,27 @@ than one placement:
 The Go/No-Go conditions in design section 2.12 remain the authority for
 production application; items 2 through 4 of that list are owner actions still
 outstanding.
+
+## 8. Review response (2026-08-17)
+
+Fable 5 returned **Approve with recommendations**: no Blocker, no High, one
+Medium (M-1) and one Low (Low-1). Merge was gated on deciding and recording an
+M-1 approach.
+
+| Finding | Resolution                                                                                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| M-1     | Option (a) adopted. `PROMPT_VERSION` moved to `candidate-summary-v3` with a comment stating what changed. Rationale for rejecting (b) is in section 5 item 0.                                          |
+| M-1     | Design 2.12 Go/No-Go item 3 now requires a visual check that AI output has not changed substantially, covering both functions.                                                                         |
+| Low-1   | `AI_PROVENANCE_VERSION` split into `AI_REDACTION_VERSION` and `AI_INPUT_SCHEMA_VERSION` in both functions, with a comment that they advance independently and share a value today only by coincidence. |
+
+One correction to the review's scoping: M-1 is described as affecting the
+candidate summary only. That is where the material change is, but
+`extract-job-posting` prompt text also now passes through NFC normalization
+and CRLF/CR to LF conversion, because those rules apply to every string the
+canonical serializer emits. No prompt version exists for job import to bump,
+and the change is limited to line endings and Unicode composition, so no code
+change was made — but the added Go/No-Go visual check covers both functions
+rather than the candidate summary alone.
+
+- Post-review HEAD: `POST_REVIEW_HEAD_PLACEHOLDER`
+- Post-review CI Run: `POST_REVIEW_RUN_PLACEHOLDER`
