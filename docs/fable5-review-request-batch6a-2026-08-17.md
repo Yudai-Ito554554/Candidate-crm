@@ -247,5 +247,13 @@ and the change is limited to line endings and Unicode composition, so no code
 change was made — but the added Go/No-Go visual check covers both functions
 rather than the candidate summary alone.
 
-- Post-review HEAD: `POST_REVIEW_HEAD_PLACEHOLDER`
-- Post-review CI Run: `POST_REVIEW_RUN_PLACEHOLDER`
+- Post-review HEAD: `4591c7b8e34b893cb7060a3560ca6e9dae0df795`
+- Post-review CI Run: `31994923848`, all 3 jobs passed
+- Post-review CI URL:
+  https://github.com/Yudai-Ito554554/Candidate-crm/actions/runs/31994923848
+
+Verification after the M-1 and Low-1 changes: Vitest 74 files / 413 tests
+passed, pgTAP 82 assertions passed on a clean database, and format check,
+typecheck, lint, build, `verify:repo`, and `git diff --check` all passed.
+`ai_summaries.prompt_version` is free text with no CHECK constraint, so the
+version bump needs no migration.
