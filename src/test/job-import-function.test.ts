@@ -128,6 +128,32 @@ describe("job posting extraction Edge Function", () => {
     expect(functionSource).toContain("24時間のai求人取り込み上限（50回）");
   });
 
+  it("fingerprints the exact provider request body before dispatch", () => {
+    expect(functionSource).toContain(
+      'requiredsecret("ai_fingerprint_hmac_key_v1")',
+    );
+    expect(functionSource).toContain(
+      'const ai_provenance_version = "job-import/1"',
+    );
+    expect(functionSource).toContain(
+      "const ai_fingerprint_hmac_key_version = 1",
+    );
+    expect(functionSource).toContain("body: providerrequestbody");
+    const dispatchBody = functionSource.slice(
+      functionSource.indexOf("const providerrequestbody"),
+      functionSource.indexOf("if (!providerresponse.ok)"),
+    );
+    expect(dispatchBody).toContain("computehmacsha256fingerprint(");
+    expect(dispatchBody).toContain('hash_algorithm: "hmac-sha256"');
+    expect(dispatchBody).toContain("input_fingerprint: inputfingerprint");
+    expect(dispatchBody).toContain(
+      'if (provenanceerror) throw new error("provenance_record_failed")',
+    );
+    expect(
+      dispatchBody.indexOf("input_fingerprint: inputfingerprint"),
+    ).toBeLessThan(dispatchBody.indexOf("body: providerrequestbody"));
+  });
+
   it("protects URL imports from SSRF, redirect abuse, and oversized responses", () => {
     expect(functionSource).toContain('url.protocol !== "https:"');
     expect(functionSource).toContain("deno.resolvedns");
