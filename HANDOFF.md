@@ -1,7 +1,7 @@
 # Candidate CRM 引き継ぎ文書（HANDOFF）
 
-最終更新: 2026-08-17（Asia/Tokyo）
-基準: `main`のBatch 6A統合commit `13218e7`
+最終更新: 2026-08-19（Asia/Tokyo、Batch 6Aのstaging適用を反映）
+基準: `main` `5eb7f46`
 
 このドキュメントは、別のAIエージェントがこのセッションの文脈なしに作業を引き継げるようにするための資料です。実装状況の要約であり、詳細は各参照ファイルを直接読んでください。Fable 5承認済みBatch 1〜Batch 5、M4テスト安定化、残Low hardeningは`main`へ反映済みです。残Low実装HEAD `f840963`のCI Run `31808266181`と証跡HEAD `b361ee9`のCI Run `31809900804`は、いずれもmacOS・Windows・Supabase全3ジョブが成功しています。Batch 6A（AI入力provenance）もFable 5がApprove（Blocker・Highなし、M-1/Low-1対応済み）し、`main`へ統合済みです（`13218e7`、CI Run `31996043655`は全3ジョブ成功）。ただしsecrets設定・Edge Function deploy・stagingでの実動作確認はオーナー作業として未実施です。
 
@@ -79,7 +79,7 @@ Fable 5の横断判断で決まった重要事項:
 - production初回バックアップ、launchd日次登録、48時間freshness監視、初回restore drillは2026-08-14に完了した。翌2026-08-15の02:30定刻ジョブも自動起動し、02:39に完了snapshotを作成して終了コード0となったことを確認済み。restore drillではproductionへ書き込まず、使い捨てローカル環境でDB件数・Storage件数・Auth・主要参照APIを確認し、完了後に隔離リソースを削除した。
 - M4: 高並列jsdom実行によるホスト資源競合を再現し、`vite.config.ts`でテストworkerを1本へ固定した。全体検索テストは不要なhoverイベントを省略し、Routerの初期lazy routeには適切なfallbackを追加した。全体検索10回連続と全365件で成功し、HydrateFallback警告が出ないことを確認した。Fable 5の条件付きApproveを反映し、将来のテスト増加時はworker競合を戻さず重いjsdom suiteを分離する方針を追記した。
 - 残Low hardening: Fable 5は実装後レビューでApprove（Blocker・High・Mediumなし）。`main`へ`--no-ff`マージ済み（`9d49471`）。実装検証HEAD `f840963`のCI Run `31808266181`と証跡HEAD `b361ee9`のCI Run `31809900804`は全3ジョブ成功。任意Lowとして、freshnessスクリプトの`mktemp -d`失敗はtrap設定前のため通知されないが、到達確率が極めて低く、現時点では対応不要と判断された。
-- Batch 6A: Fable 5は`7b3cd30..b4771aa`をApprove（Blocker・Highなし）。M-1（Medium、実効プロンプトの変化）とLow-1（version定数の分離）は対応済み。`main`へ`--no-ff`マージ済み（`13218e7`）で、マージ後のCI Run `31996043655`はmacOS・Windows・Supabase全3ジョブ成功。レビュー結果と対応の記録は`docs/fable5-review-request-batch6a-2026-08-17.md`の8節。**オーナー作業として未実施のものが4件残る**: (1) staging・production双方のEdge Function secretsへ`AI_FINGERPRINT_HMAC_KEY_V1`を設定（十分な長さのランダム値。**環境ごとに別の値にする**——同値だとstaging側の漏洩でproductionのfingerprintが突合可能になる。値はチャットやリポジトリへ出さず、パスワードマネージャへ保管する。**削除すると過去記録が検証不能になり復旧できない**）、(2) migration適用→Edge Function 2本のdeployの順で実施（列がない状態でdeployするとprovenance UPDATEが失敗し、fail-closedで送信自体が止まる）、(3) stagingでAI候補者サマリーとAI求人取り込みを1回ずつ実行して5列の記録形式と同一入力の再現性を確認し、**あわせてAI出力の内容が従来と大きく変わっていないことを両機能で目視確認**（canonical serialization採用でプロンプトの実体が変化しているため）、(4) key未設定状態でのfail-closed動作をstagingで1回実証（確認後にkeyを戻す）。(3)が全て通ってからproduction適用。production適用条件は設計書2.12節が正本。
+- Batch 6A: Fable 5は`7b3cd30..b4771aa`をApprove（Blocker・Highなし）。M-1（Medium、実効プロンプトの変化）とLow-1（version定数の分離）は対応済み。`main`へ`--no-ff`マージ済み（`13218e7`）で、マージ後のCI Run `31996043655`はmacOS・Windows・Supabase全3ジョブ成功。レビュー結果と対応の記録は`docs/fable5-review-request-batch6a-2026-08-17.md`の8節。**オーナー作業として未実施のものが4件残る**: (1) staging・production双方のEdge Function secretsへ`AI_FINGERPRINT_HMAC_KEY_V1`を設定（十分な長さのランダム値。**環境ごとに別の値にする**——同値だとstaging側の漏洩でproductionのfingerprintが突合可能になる。値はチャットやリポジトリへ出さず、パスワードマネージャへ保管する。**削除すると過去記録が検証不能になり復旧できない**）、(2) migration適用→Edge Function 2本のdeployの順で実施（列がない状態でdeployするとprovenance UPDATEが失敗し、fail-closedで送信自体が止まる）、(3) stagingでAI候補者サマリーとAI求人取り込みを1回ずつ実行して5列の記録形式と同一入力の再現性を確認し、**あわせてAI出力の内容が従来と大きく変わっていないことを両機能で目視確認**（canonical serialization採用でプロンプトの実体が変化しているため）、(4) key未設定状態でのfail-closed動作をstagingで1回実証（確認後にkeyを戻す）。(3)が全て通ってからproduction適用。production適用条件は設計書2.12節が正本。**2026-08-19、(1)〜(4)のstaging分をすべて完了した**（証跡は`docs/production-go-no-go-checklist.md`の「Stage 3 参考情報: Batch 6A（AI入力provenance）のstaging適用記録（2026-08-19）」）。stagingはmigrationが7本未適用の状態だったため、Batch 6Aの1本ではなくBatch 3のRLS書き換えとBatch 4の監査actor分類を含む7本を一括適用している。**残るオーナー作業はproduction適用のみ。** production側もmigration適用状況を`supabase migration list --linked`で先に確認すること。またfail-closedの実証はstagingで済んでおり、**productionでは再演しない**（key削除の不可逆性については`docs/backup-runbook.md`9節）。
 
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
@@ -114,9 +114,9 @@ D区分（今回のスコープ外、実装自体が未着手）: Gmail/Outlook�
 
 ## 5. 次に実装すべき内容（優先順位順、ドキュメント上の合意事項）
 
-1. **Batch 6Aのオーナー作業**: (1) staging・productionへ`AI_FINGERPRINT_HMAC_KEY_V1`を設定（**環境ごとに別の値**。同値だとstaging漏洩でproductionのfingerprintが突合可能になる。値はパスワードマネージャへ保管し、**削除すると過去記録が検証不能になる**）、(2) migration適用→Edge Function deployの順（列がないとprovenance UPDATEが失敗して送信されない）、(3) stagingで両機能を各1回実行し5列・同一fingerprint・AI出力の目視確認・key一時除去のfail-closed実証、(4) 全て通ってからproduction適用。
-2. **Windows実機でのstaging版UAT**（`docs/uat-checklist.md`に沿って）: インストール・起動・終了・再起動・アンインストール（S3-10）。社内の他利用者はWindowsを使うため最優先。Stage 3A（社内Windows展開）の中心項目。
-3. **S3-3の実施**: Fable 5の回答どおり、stagingへ向けたweb buildをブラウザで起動し、viewerアカウントでURLバーから編集6ルートを直打ちして確認する。テスト専用deep-linkは実装しない。
+1. **Batch 6Aのproduction適用**（stagingは2026-08-19に完了）: production用`AI_FINGERPRINT_HMAC_KEY_V1`を設定（**stagingとは別の値**。同値だとstaging漏洩でproductionのfingerprintが突合可能になる。設定直後にパスワードマネージャへ保管し、Dashboardのダイジェストを控えと照合する。**削除すると過去記録が検証不能になる**）→ migration適用 → Edge Function deployの順（列がないとprovenance UPDATEが失敗して送信されない）。**適用前に`supabase migration list --linked`でproduction側の未適用migrationを確認すること**——stagingは7本遅れていた。fail-closedの実証はstagingで完了しており**productionでは再演しない**。
+2. **S3-10は2026-08-17に完了済み**（Windows実機でのインストール・起動・終了・再起動・アンインストール、およびBatch 5のCredential Manager確認）。残るのはWindows実機でのstaging/production共存・資格情報分離のみで、production版をWindowsへ導入する際に実施する。
+3. **S3-3の方式再決定**（実施はその後）: Fable 5指定の「web buildをブラウザで開きURLバーから直打ち」は、`persistSession: false`とOS資格情報ストア前提のセッション復元により**このコードベースでは成立しない**ことが2026-08-19に判明した。完全リロードで必ずログアウトし、`protected-route.tsx:16`が遷移元を保持せず`login-page.tsx:34,72`が常に`/`へ戻すため、要求ルートへ到達できない。選択肢A（ログイン後の要求ルート復帰を実装）／B（SPA内ナビゲーションで確認）／C（保留）は未決定で、Fable 5への再照会が妥当。詳細は`docs/development-handoff-2026-08-19.md`。テスト専用deep-linkは引き続き実装しない。
 4. **S3-7の企業・求人アーカイブ/復元の実地確認**（候補者は完了済み）。
 5. Stage 3A残項目（AI求人取り込み例外系のOS実機一連UAT）を進め、3AのGo/No-Goを判定する。
 6. **Batch 5残UAT**: Windows実機入手後にCredential Managerでログイン復元・ログアウト削除・staging/production分離を確認する。macOS Keychain明示拒否は、内部版で安全に再現できる手順を定めたうえで補完する。
