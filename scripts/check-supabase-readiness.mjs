@@ -40,6 +40,19 @@ function parseEnvironmentFile(filePath) {
   return values;
 }
 
+function spawnSupabaseCli(command, args, options) {
+  // Windowsのnode_modules/.binはsupabase.cmdを生成するが、NodeはCVE-2024-27980の
+  // 対策以降、.cmd/.batの直接spawnをEINVALで拒否する。認証済みでも失敗する
+  // false negativeになるため、win32ではシェル経由で起動する。
+  if (process.platform !== "win32") return spawnSync(command, args, options);
+
+  // shell有効時に引数配列を渡すとNodeは連結するだけでエスケープせず、DEP0190の
+  // 対象になる。commandとargsはリポジトリ内のパスと定数のみで外部入力を含まないため、
+  // 空白を含むパスに備えて自前で引用し、1つのコマンド文字列として渡す。
+  const commandLine = [command, ...args].map((part) => `"${part}"`).join(" ");
+  return spawnSync(commandLine, { ...options, shell: true });
+}
+
 function resolveSupabaseCommand() {
   const executableName =
     process.platform === "win32" ? "supabase.cmd" : "supabase";
@@ -51,7 +64,7 @@ function resolveSupabaseCommand() {
   );
   if (existsSync(localCommand)) return localCommand;
 
-  const globalCheck = spawnSync(executableName, ["--version"], {
+  const globalCheck = spawnSupabaseCli(executableName, ["--version"], {
     encoding: "utf8",
     stdio: "ignore",
   });
@@ -67,11 +80,15 @@ function commandIsAvailable(command, args) {
 }
 
 function checkSupabaseAuthentication(command) {
-  const result = spawnSync(command, ["projects", "list", "--output", "json"], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: 15_000,
-  });
+  const result = spawnSupabaseCli(
+    command,
+    ["projects", "list", "--output", "json"],
+    {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 15_000,
+    },
+  );
   if (result.status === 0) return { authenticated: true, reason: null };
 
   const diagnostic = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
