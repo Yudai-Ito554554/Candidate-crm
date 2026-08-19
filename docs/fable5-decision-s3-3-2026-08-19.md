@@ -39,7 +39,9 @@ S3-3が守ろうとしているのは「viewerが編集画面へ到達し、編�
 
 **(2) 権限境界の証跡: pgTAP**
 
-viewerが業務テーブルへINSERT/UPDATEできないことが既存pgTAPで固定されていること(既に達成済み)。
+viewerが業務テーブルへINSERT/UPDATEできないことがpgTAPで固定されていること。**`supabase/tests/007_viewer_write_denial.test.sql` により2026-08-19に新規に固定した。**
+
+> **訂正(2026-08-19、Fable 5)**: 起案時は「既に達成済み」と記載したが、これは未確認の推測だった。既存pgTAPは51個のpolicy式が `current_profile_role()` を参照することを構造として確認していたのみで、実際の書き込みを試みる検証のfixtureは admin / suspended / pending の3ロールに限られ、viewerロールでINSERT/UPDATEを試みる検証は存在しなかった。
 
 **(3) 実機UAT: Tauriアプリ内での到達試行**
 
