@@ -106,7 +106,7 @@ gh run list --branch main --limit 3
 ## 7. 積み残し
 
 - **S3-3(3)**、**S3-7**（上記2〜4節）
-- **deep link復帰のUX改善**: Fable 5が案Aを「S3-3の合格条件にはしないが、独立した改善として起票してよい」としている。未起票
+- ~~**deep link復帰のUX改善**~~: 2026-08-20に **B-6** として起票し実装済み（`src/features/auth/login-redirect.ts`、`protected-route.tsx`、`login-page.tsx`）。S3-3の合格条件ではない独立項目である点は変わらない
 - **社員2名への配布**: Supabaseダッシュボードで直接ユーザー作成（Freeプランは招待メールが届かない）→ production版Windowsビルド配布 → role設定
 - `HANDOFF.md` の「最終更新 / 基準」が `5eb7f46` のまま。プロジェクト全体の正本なので、区切りのよいところで更新するとよい
 
