@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { EnvironmentBadge } from "@/components/common/environment-badge";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthLoadingScreen } from "@/features/auth/auth-loading-screen";
 import { ConfigurationErrorPage } from "@/features/auth/configuration-error-page";
+import { resolveLoginRedirect } from "@/features/auth/login-redirect";
 import { useAuth } from "@/features/auth/use-auth";
 import { environment } from "@/lib/env";
 
@@ -22,7 +23,10 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
   const auth = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  // Set by ProtectedRoute when it refused a navigation. Falls back to home.
+  const redirectTo = resolveLoginRedirect(location.state);
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
@@ -31,9 +35,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (auth.status === "authenticated") {
-      void navigate("/", { replace: true });
+      void navigate(redirectTo, { replace: true });
     }
-  }, [auth.status, navigate]);
+  }, [auth.status, navigate, redirectTo]);
 
   if (!environment.success) return <ConfigurationErrorPage />;
 
@@ -41,7 +45,7 @@ export function LoginPage() {
 
   if (auth.status === "loading")
     return <AuthLoadingScreen environmentName={environmentName} />;
-  if (auth.session) return <Navigate replace to="/" />;
+  if (auth.session) return <Navigate replace to={redirectTo} />;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -69,7 +73,7 @@ export function LoginPage() {
                 values.email,
                 values.password,
               );
-              if (succeeded) void navigate("/", { replace: true });
+              if (succeeded) void navigate(redirectTo, { replace: true });
             })(event);
           }}
         >
