@@ -1,0 +1,115 @@
+# Candidate CRM 作業引き継ぎ（2026-08-19 職場PCセッション）
+
+作成日: 2026-08-20（作業自体は2026-08-19 JST。日付を跨いだため作成日のみ翌日）
+基準: `main` `9368593`（push済み、CI Run `32260244532` は全3ジョブ成功）
+作業機: 職場Windows PC（`C:\dev\candidate-crm`）
+
+production適用の実行計画は `docs/production-release-plan-2026-08-19-batch6a.md`、自宅PCへの移行手順は `docs/development-handoff-2026-08-19-home-pc-resume.md` が正本。本書はそれらを置き換えず、**2026-08-19に職場PCで完了した分と、次に手をつける場所**だけを記録する。
+
+## 1. このセッションで完了したこと
+
+| コミット  | 内容                                                                    |
+| --------- | ----------------------------------------------------------------------- |
+| `bbc3b8e` | 自宅PCへの移行引き継ぎを追加（職場PCではWSL2がポリシーでブロック）      |
+| `b8c5f8f` | 既存引き継ぎのWSL2節から上記へポインタ                                  |
+| `3debb76` | **fix**: Supabase CLIをWindowsでシェル経由起動（readiness checkのバグ） |
+| `3d71fc7` | S3-3の方式不成立をFable 5へ照会する文書                                 |
+| `3704bb1` | **test**: pgTAP 007（viewerの書き込み拒否）                             |
+| `2d9b046` | Fable 5決定（案D）の反映                                                |
+| `9368593` | 決定文書3節(2)の訂正                                                    |
+
+### 1.1 `scripts/check-supabase-readiness.mjs` のWindowsバグ修正（`3debb76`）
+
+**修正済み。** Windowsでは `node_modules/.bin/supabase.cmd` が解決されるが、NodeはCVE-2024-27980の対策以降 `.cmd` の直接spawnを **EINVAL** で拒否するため、認証済みでも `npm run supabase:check:linked` が必ず「認証状態を確認できません」を返していた（false negative）。
+
+共通ヘルパ `spawnSupabaseCli()` を追加し、win32のみシェル経由で起動する。**引数配列ではなく引用済みの単一コマンド文字列**を渡している。`shell: true` と引数配列の組み合わせはNode 24が `DEP0190`（引数が連結されるだけでエスケープされない）を警告するためで、この形なら警告が出ず、空白を含むリポジトリパスでも壊れない。非Windowsは従来どおり直接spawn。
+
+実測での確認: 修正前は `unavailable` 分岐（「認証状態を確認できません」）、修正後は `missing_token` 分岐（「未認証です」）。このPCは未ログインなので後者が正しい診断。**認証済みでの `✓` 表示は未確認**（ログインしている環境で一度見ておくとよい）。
+
+`commandIsAvailable()` は変更していない。`docker` の起動にしか使われず、`.exe` なので直接spawnで動く。
+
+### 1.2 S3-3の方式再決定（`3d71fc7` → `2d9b046` → `9368593`）
+
+前回方式（web buildをブラウザで開きURLバーから直打ち）が成立しない理由をコード根拠つきで照会し、Fable 5が**案D（UAT要件の再定義）**を決定。前回方式は撤回された。
+
+- 崩れた前提: 「Tauriでもブラウザでも同一のReact SPA」はUIとルーティングでは成立するが、**セッション永続化層では成立しない**（`persistSession: false` + 復元経路がOS資格情報ストアのみ）。ブラウザでは全ロールが未ログインで着地する
+- Fable 5の自己申告として、この前提を崩したのは翌日承認したBatch 5であり、S3-3への波及を検討しなかったのは自分の欠落だと記録されている
+- 却下: A（ログイン後の要求ルート復帰）はチェックリストのために本番コードを変える構図、C（web buildのみ `persistSession: true`）はBatch 5設計に反する
+- **申し送りとして、認証・セッション層の変更は未完了項目の検証方式を無効化しうる**旨をチェックリストの「使い方」節へ追加した
+
+決定文書は `docs/fable5-decision-s3-3-2026-08-19.md`、照会文書は `docs/fable5-request-s3-3-viewer-direct-url-2026-08-19.md`。
+
+### 1.3 pgTAP 007 の追加（`3704bb1`）
+
+決定文書は合格条件(2)「viewerが業務テーブルへINSERT/UPDATEできないことがpgTAPで固定されている」を**達成済みと記載していたが、実際には未達だった**。既存pgTAPは51個のpolicy式が `current_profile_role()` を参照することを構造として確認していたのみで、実書き込みを試みるfixtureは admin / suspended / pending の3ロールに限られ、**viewerで書き込みを試みる検証は存在しなかった**。
+
+`supabase/tests/007_viewer_write_denial.test.sql` を追加（7 assertion）。
+
+- viewerが candidates / companies を**読める**ことを先に固定（拒否が「viewerだから」であり「fixtureが見えていないから」ではないことを保証）
+- candidates / companies / jobs へのINSERTが `42501` で失敗する
+- UPDATEは**エラーコードではなく値**で確認する。`editors can update candidates` のUSING句にviewerは一致しないため、UPDATEは例外ではなく**0行更新**で終わるため
+
+この指摘を受けてFable 5は決定文書3節(2)を訂正した（`9368593`。元の記述は日付つきの訂正として残してある）。
+
+**CI Run `32260244532` で初回実行し PASS。** ローカルでは実行できない（`supabase test db` にDockerが必要）ため、検証はCIのUbuntuジョブが担保している。
+
+## 2. S3-3 の現在地
+
+| 合格条件                                                          | 状態                                                     |
+| ----------------------------------------------------------------- | -------------------------------------------------------- |
+| (1) 自動テストが編集7ルートで閲覧専用パネルを assert していること | ✅ 達成済み（`src/pages/app-routes.test.tsx:2811-2844`） |
+| (2) viewerの書き込み拒否がpgTAPで固定されていること               | ✅ 2026-08-19に達成（007、CI検証済み）                   |
+| (3) staging Tauriアプリでの実機UAT                                | ⬜ **未実施。残っているのはこれだけ**                    |
+
+## 3. 残っている (3) の確認項目
+
+staging Tauriアプリに**viewerでログイン**し、アプリ内で到達可能なあらゆる経路から編集画面へ到達を試みる。
+
+- グローバル作成メニュー（新規候補者・企業・求人）に導線が出ないこと
+- 候補者・企業・求人の各詳細画面に編集ボタンが出ないこと
+- 候補者取り込み画面（`/candidates/import`）への導線が出ないこと
+- 一覧・詳細・タブ切替を一通り操作し、編集フォームへ到達できないこと
+
+**観測点を取り違えないこと。** 合格の観測は「**閲覧専用パネル（`role="alert"` の「閲覧専用アカウントです」）が出ること、または導線自体が存在しないこと**」である。**ログイン画面へ飛ぶことは合格の証跡にならない**。`src/features/access/editor-route.tsx:18-35` はリダイレクトせずパネルを表示する実装なので、ログイン画面が出た場合はUATの手順が間違っている（未ログイン状態を見ている）。
+
+任意項目: staging QAビルドで開発者ツールが開ける場合、コンソールから `history.pushState` でルートを直接切り替えてパネルが出ることを確認する。開けなければ不要。
+
+## 4. S3-7 も同じstagingアプリで実施できる
+
+S3-7（企業・求人の重複警告 / アーカイブ / 復元の実地確認）は、S3-3(3)と**同じstagingアプリで続けて実施できる**。ただし**書き込み操作なので admin か agent でログインし直す**こと（viewerのままでは操作導線が出ない）。候補者については2026-08-11に確認済みで、残っているのは企業・求人。
+
+順序としては、viewerでS3-3(3)を終えてからログアウトし、admin/agentで入り直してS3-7を行うのが無駄がない。
+
+## 5. production適用は自宅PC待ち
+
+未適用migration 7本 + Batch 6A のproduction適用は**このPCでは実行できない**。`supabase db dump` が `pg_dump` をDockerコンテナ内で実行するため、Docker（＝WSL2）が必須だが、**職場PCではWSL2のインストールが管理ポリシーによりブロックされる（403）**。Freeプランで自動バックアップがなく、適用前バックアップが唯一の復旧手段であるため、バックアップなしで適用へ進む選択肢はない。
+
+自宅PCでの再開手順は `docs/development-handoff-2026-08-19-home-pc-resume.md` が正本。`git pull --ff-only` だけで最新に追いつく（このPCから持ち出すファイルはない）。
+
+## 6. 次回このPCで再開する場合の最初のコマンド
+
+```powershell
+cd C:\dev\candidate-crm
+git status
+git pull --ff-only
+git log --oneline -5
+gh run list --branch main --limit 3
+```
+
+`9368593` 以降が入っていること、直近のCIが成功していることを確認してから着手する。
+
+このPCで**できる**作業: S3-3(3)とS3-7の実機UAT、コード修正全般、ドキュメント作業、CI経由でのpgTAP検証。
+このPCで**できない**作業: production/staging へのmigration適用、バックアップ、`supabase db reset` / `supabase test db` のローカル実行（いずれもDocker必須）。
+
+実機UATに入る前に `.env` の設定が必要。現在このPCの `.env` は**キー行はあるが値が空**なので、staging の `VITE_APP_ENV=staging` / URL / publishable key を入れる（値の入力はオーナー操作）。設定後、`npm run supabase:check:linked` でlink先とアプリ設定の整合を確認できる。
+
+## 7. 積み残し
+
+- **S3-3(3)**、**S3-7**（上記2〜4節）
+- **deep link復帰のUX改善**: Fable 5が案Aを「S3-3の合格条件にはしないが、独立した改善として起票してよい」としている。未起票
+- **社員2名への配布**: Supabaseダッシュボードで直接ユーザー作成（Freeプランは招待メールが届かない）→ production版Windowsビルド配布 → role設定
+- `HANDOFF.md` の「最終更新 / 基準」が `5eb7f46` のまま。プロジェクト全体の正本なので、区切りのよいところで更新するとよい
+
+## 8. 秘密情報の扱い
+
+本セッションでパスワード・APIキー・接続文字列の値を扱っていない。production用 `AI_FINGERPRINT_HMAC_KEY_V1` は**未生成のまま**であり、生成は自宅PCでの適用手順4（バックアップの後、migrationの前）で行う。

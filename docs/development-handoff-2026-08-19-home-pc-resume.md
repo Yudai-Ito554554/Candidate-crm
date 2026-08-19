@@ -104,10 +104,10 @@ link先は **production `dsaqarejqslzgcatkxeh`** へ切り替える（staging �
 
 ## 5. production適用後に残るタスク（変更なし）
 
-- **S3-3（viewer直URL確認）**: 方式が成立しないことが判明済み。Fable 5への再照会が必要（詳細は `docs/development-handoff-2026-08-19.md`）
+- **S3-3（viewer直URL確認）**: 2026-08-19にFable 5が案D（UAT要件の再定義）を決定し、前回方式は撤回済み（`docs/fable5-decision-s3-3-2026-08-19.md`）。合格条件(1)(2)は達成済みで、残るはstaging Tauriアプリでの実機UAT(3)のみ
 - **S3-7**: 企業・求人の重複警告/アーカイブ/復元の実地確認
 - **社員2名への配布**: Supabaseダッシュボードで直接ユーザー作成（Freeプランは招待メールが届かない）→ production版Windowsビルド配布 → role を agent か viewer に設定
-- `scripts/check-supabase-readiness.mjs` のWindowsバグ（未修正。`spawnSync` 2箇所に `shell: process.platform === "win32"` を渡す）
+- ~~`scripts/check-supabase-readiness.mjs` のWindowsバグ~~ **2026-08-19に修正済み（`3debb76`）。** 自宅PCでも `npm run supabase:check:linked` がそのまま使える
 
 ## 6. 秘密情報の扱い
 

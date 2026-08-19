@@ -78,7 +78,9 @@ status= null error= EINVAL spawnSync ...supabase.cmd EINVAL
 
 同じコマンドをシェル経由で実行すると `exit=0` で正常にプロジェクト一覧が返る。**false negative** である。
 
-本セッションでは、残る5項目（`.env`存在・URL形式・publishable key・CLI存在・**link済みrefとアプリ設定の一致**）が通っていること、および認証状態を手動で `exit=0` として確認したことをもって先へ進めた。修正案は両 `spawnSync` へ `shell: process.platform === "win32"` を渡すこと。AGENTS.md の「Preserve macOS and Windows compatibility」に反する実バグなので、次に着手する候補。
+本セッションでは、残る5項目（`.env`存在・URL形式・publishable key・CLI存在・**link済みrefとアプリ設定の一致**）が通っていること、および認証状態を手動で `exit=0` として確認したことをもって先へ進めた。
+
+**2026-08-19に修正済み（`3debb76`）。** 共通ヘルパ `spawnSupabaseCli()` を追加し、win32のみ引用済みの単一コマンド文字列をシェル経由で実行する（`shell: true` と引数配列の併用はNode 24の `DEP0190` に当たるため避けた）。詳細は `docs/development-handoff-2026-08-20.md` 1.1節。
 
 ### WSL2未導入
 
