@@ -84,6 +84,8 @@ status= null error= EINVAL spawnSync ...supabase.cmd EINVAL
 
 前回から変わらず。ローカルの `supabase:reset` / `supabase:test` は実行不可で、DB検証はCIのUbuntuジョブが担保。
 
+**2026-08-19 追記: 職場PCではWSL2のインストールが管理ポリシーによりブロックされた（403）。** Docker導入を断念し、production適用は自宅PCで行う。移行手順は `docs/development-handoff-2026-08-19-home-pc-resume.md`。
+
 ### AI出力の表示崩れ（軽微）
 
 候補者サマリーの「面談で確認すべきこと」に、モデルが改行を実文字ではなく `\n` の2文字として返す場合があり、画面へそのまま表示される。2026-08-19の2回目の生成で発生し、1回目と4回目では発生しなかった。コードの退行ではなくモデル出力の揺れだが、利用者の目に触れる表示崩れとして記録する。
