@@ -24,7 +24,7 @@ production適用の実行計画は `docs/production-release-plan-2026-08-19-batc
 
 共通ヘルパ `spawnSupabaseCli()` を追加し、win32のみシェル経由で起動する。**引数配列ではなく引用済みの単一コマンド文字列**を渡している。`shell: true` と引数配列の組み合わせはNode 24が `DEP0190`（引数が連結されるだけでエスケープされない）を警告するためで、この形なら警告が出ず、空白を含むリポジトリパスでも壊れない。非Windowsは従来どおり直接spawn。
 
-実測での確認: 修正前は `unavailable` 分岐（「認証状態を確認できません」）、修正後は `missing_token` 分岐（「未認証です」）。このPCは未ログインなので後者が正しい診断。**認証済みでの `✓` 表示は未確認**（ログインしている環境で一度見ておくとよい）。
+実測での確認: 修正前は `unavailable` 分岐（「認証状態を確認できません」）、修正後は `missing_token` 分岐（「未認証です」）。このPCは当時未ログインだったので後者が正しい診断。**2026-08-20に `supabase login` 済みの状態で再実行し、`✓ Supabase CLIの認証を確認しました。` を含む全6項目の `✓` を確認した**（`Supabase linked非本番検証を開始できます。`）。これで修正の両分岐（認証済み／未認証）が実測で確認された。
 
 `commandIsAvailable()` は変更していない。`docker` の起動にしか使われず、`.exe` なので直接spawnで動く。
 
@@ -101,7 +101,7 @@ gh run list --branch main --limit 3
 このPCで**できる**作業: S3-3(3)とS3-7の実機UAT、コード修正全般、ドキュメント作業、CI経由でのpgTAP検証。
 このPCで**できない**作業: production/staging へのmigration適用、バックアップ、`supabase db reset` / `supabase test db` のローカル実行（いずれもDocker必須）。
 
-実機UATに入る前に `.env` の設定が必要。現在このPCの `.env` は**キー行はあるが値が空**なので、staging の `VITE_APP_ENV=staging` / URL / publishable key を入れる（値の入力はオーナー操作）。設定後、`npm run supabase:check:linked` でlink先とアプリ設定の整合を確認できる。
+**`.env` は2026-08-20に設定済み**（`VITE_APP_ENV=staging`、link先 `admjgbfrfoczpxdtxmgy` = staging。production `dsaqarejqslzgcatkxeh` ではないことを確認済み）。`npm run supabase:check:linked` が全項目 `✓` を返す状態。
 
 ## 7. 積み残し
 
