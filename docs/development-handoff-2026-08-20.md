@@ -89,13 +89,44 @@ S3-7（企業・求人の重複警告 / アーカイブ / 復元の実地確認�
 
 **実施結果: 完了。** 2026-08-20に admin `uat-admin@example-uat.invalid` で企業・求人のアーカイブ／復元を確認した。候補者は2026-08-11に確認済みで、3エンティティすべての実地確認が揃った。
 
-## 5. production適用は自宅PC待ち
+## 5. production適用（2026-08-20にこのPCで実行可能になった）
 
-未適用migration 7本 + Batch 6A のproduction適用は**このPCでは実行できない**。`supabase db dump` が `pg_dump` をDockerコンテナ内で実行するため、Docker（＝WSL2）が必須だが、**職場PCではWSL2のインストールが管理ポリシーによりブロックされる（403）**。Freeプランで自動バックアップがなく、適用前バックアップが唯一の復旧手段であるため、バックアップなしで適用へ進む選択肢はない。
+**`wsl --install` が成功した（403は出なかった）。** 2026-08-19の「職場PCではWSL2のインストールが管理ポリシーによりブロックされる」という結論は**解消**した。`docs/development-handoff-2026-08-19-home-pc-resume.md` の「職場PCでは実行不可能」という記述は本節で上書きされる。
 
-**2026-08-20に再確認したが状況は変わらず**: `wsl --status` は「Linux 用 Windows サブシステムがインストールされていません」で exit 50、`docker info` は `npipe:////./pipe/dockerDesktopLinuxEngine` へ接続できず exit 1。Docker CLI 本体は存在するが Docker Desktop は未セットアップ（設定キー `HKCU:\SOFTWARE\Docker Inc.\Docker\2.0` なし・プロセス未起動）で、WSL2 が入らない限り Linux エンジンは起動しない。Windowsオプション機能の状態照会は管理者権限が要るため未実施。
+**現在は再起動待ち。** 再起動が済むまでWSL2は動かないので、この時点ではまだ何も実行できない。
 
-自宅PCでの再開手順は `docs/development-handoff-2026-08-19-home-pc-resume.md` が正本。`git pull --ff-only` だけで最新に追いつく（このPCから持ち出すファイルはない）。
+### 再起動後の判定手順
+
+1. `wsl --status` が版数を返すこと（2026-08-20午前は「インストールされていません」で exit 50 だった）
+2. **Docker Desktopを起動する。** このPCでは一度もセットアップされていないため（設定キー `HKCU:\SOFTWARE\Docker Inc.\Docker\2.0` が存在しない）、初回起動でライセンス同意や管理者権限の要求が出る可能性がある。CLI（`docker.exe`）自体は導入済み
+3. `docker info` が成功すること。これが `docs/production-release-plan-2026-08-19-batch6a.md` の前提条件1そのもの
+
+3つとも通ればproduction適用へ進める。通らなければ自宅PCへ戻す（手順は上記の移行引き継ぎが正本）。
+
+### 進める場合の注意
+
+- 現在の link 先と `.env` は **staging `admjgbfrfoczpxdtxmgy`**。production は `dsaqarejqslzgcatkxeh` で、切り替えは実行計画の手順1（Runbook 1節の誤接続防止チェック、1名実施のため1.1の二段階確認）に従う
+- production用 `AI_FINGERPRINT_HMAC_KEY_V1` は**未生成**。stagingとは別の値を使う（実行計画 前提条件3、手順4）
+- Freeプランで自動バックアップが無く、手順2・3のバックアップが唯一の復旧手段。`.backup-db-ok` / `.backup-storage-ok` の2マーカーを確認してから先へ進む
+- 手順6の `db push --dry-run` で**7本だけ**が出ることを確認する。1本でも差異があれば中止
+
+## 5.1 再起動後に貼る文面
+
+再起動が済んだら、次の文面をそのまま貼れば続きから再開できる。
+
+```
+再起動しました。WSL2の導入後です。
+
+1. wsl --status と docker info を確認してください
+2. 両方通ったら docs/development-handoff-2026-08-20.md 5節と
+   docs/production-release-plan-2026-08-19-batch6a.md を読んで、
+   production適用の手順1（誤接続防止チェック）から進めてください
+3. db push --dry-run の結果は必ず見せて止まってください。
+   7本以外が出たら中止です
+4. 通らなかった場合は、何が足りないかを報告して止まってください
+```
+
+Docker Desktopの初回起動（ライセンス同意・管理者権限の要求が出る可能性がある）は手作業になるので、`docker info` が通らない場合はまずそこを疑う。
 
 ## 6. 次回このPCで再開する場合の最初のコマンド
 

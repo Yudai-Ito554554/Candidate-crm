@@ -22,7 +22,7 @@ staging（`admjgbfrfoczpxdtxmgy`）へは2026-08-19に同一の7本を適用済�
 
 ## 前提条件（着手前に満たすこと）
 
-1. **WSL2 + Docker Desktop が動作していること。** `supabase db dump` は `pg_dump` をコンテナ内で実行するため Docker デーモンが必須。2026-08-19時点のWindows機はWSL2未導入で、Runbook 2節のバックアップが実行できず0バイトのファイルが生成されることを実地に確認済み。`docker info` が成功することを着手前に確認する。
+1. **WSL2 + Docker Desktop が動作していること。** `supabase db dump` は `pg_dump` をコンテナ内で実行するため Docker デーモンが必須。2026-08-19時点のWindows機はWSL2未導入で、Runbook 2節のバックアップが実行できず0バイトのファイルが生成されることを実地に確認済み。`docker info` が成功することを着手前に確認する。**2026-08-20追記: 職場PCで `wsl --install` が成功し、WSL2導入不可という制約は解消した（再起動待ち）。Docker Desktopは未セットアップのため初回起動が必要。本条件の判定は変わらず `docker info` の成否で行う。**
 2. **適用直前のバックアップ**（Runbook 2節・3節）を取得済みであること。Freeプランのため自動バックアップがなく、これが唯一の復旧手段。
 3. production用 `AI_FINGERPRINT_HMAC_KEY_V1` を設定済みであること（**stagingとは別の値**）。設定直後にDashboardのSHA256ダイジェストを控えと照合する（`docs/backup-runbook.md` 9節 項目4）。
 
