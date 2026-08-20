@@ -89,7 +89,12 @@ describe("job import UAT fixtures", () => {
       "utf8",
     );
 
-    expect(contents).toContain("株式会社メディカルフロンティア（架空企業）");
+    // The extractor drops a parenthetical suffix, so the name it returns would
+    // stop matching a company registered under the annotated form.
+    expect(contents).toContain("株式会社メディカルフロンティア\n");
+    expect(contents).not.toContain(
+      "株式会社メディカルフロンティア（架空企業）",
+    );
     expect(contents).toContain(
       "Webサイト：https://medical-frontier.example/recruit",
     );

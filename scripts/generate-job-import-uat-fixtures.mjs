@@ -212,8 +212,12 @@ for (const [name, contents] of outputs) {
   console.log(`${name}: ${contents.length} bytes`);
 }
 
+// The company name carries no parenthetical. A suffix like "（架空企業）" reads
+// as an annotation, and the extractor drops it, which makes the extracted name
+// stop matching the company registered under the full string. The fictional
+// marking moves to the notes instead, where nothing is extracted from.
 const COMPANY_CONFLICT_TEXT = [
-  "株式会社メディカルフロンティア（架空企業）",
+  "株式会社メディカルフロンティア",
   "",
   "業種：医療機器",
   "Webサイト：https://medical-frontier.example/recruit",
@@ -235,8 +239,8 @@ const COMPANY_CONFLICT_TEXT = [
   "",
   "注記",
   "本書はCandidate CRMの動作確認用に作成した架空の求人票です。",
+  "上記の企業名・Webサイトはいずれも架空で、実在する企業・求人とは関係ありません。",
   "企業照合の競合を再現するため、企業名とWebサイトを両方記載しています。",
-  "実在する企業・求人とは関係ありません。",
   "",
 ].join("\n");
 
