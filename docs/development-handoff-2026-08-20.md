@@ -107,7 +107,7 @@ gh run list --branch main --limit 3
 
 `9368593` 以降が入っていること、直近のCIが成功していることを確認してから着手する。
 
-このPCで**できる**作業: 実機UAT（S3-3(3)とS3-7は2026-08-20に完了。残るはS3-6のうち不正PDF拒否・パスワード保護PDF拒否・企業重複検知・画面内キャッシュの4シナリオ（入力バリデーション系3シナリオは2026-08-20に完了））、コード修正全般、ドキュメント作業、CI経由でのpgTAP検証。
+このPCで**できる**作業: 実機UAT（S3-3(3)・S3-7・S3-6は2026-08-20に完了し、**Stage 3Aの実機UATは全て終わった**）、コード修正全般、ドキュメント作業、CI経由でのpgTAP検証。
 このPCで**できない**作業: production/staging へのmigration適用、バックアップ、`supabase db reset` / `supabase test db` のローカル実行（いずれもDocker必須）。
 
 **`.env` は2026-08-20に設定済み**（`VITE_APP_ENV=staging`、link先 `admjgbfrfoczpxdtxmgy` = staging。production `dsaqarejqslzgcatkxeh` ではないことを確認済み）。`npm run supabase:check:linked` が全項目 `✓` を返す状態。

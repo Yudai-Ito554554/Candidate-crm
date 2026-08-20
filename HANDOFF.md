@@ -84,7 +84,7 @@ Fable 5の横断判断で決まった重要事項:
 ただし、以下は「着手済みだが未完了」という意味で実質的に進行中の一連の取り組み:
 
 - **Stage 3（外部顧客への一般提供）判定**: 14項目中、Go/No-Go未記入。多くの重大項目が未着手（詳細は4節）。
-- **社内試験運用のWindows展開**: 2026-08-17に**S3-10とBatch 5残UAT（Credential Manager）を実機で完了**。staging QA成果物はDesktop QA artifacts Run `32002806871`（HEAD `0ec8419`）でビルドし、`C:\dev\qa-staging`へ展開・SHA256照合済み。GitHub上の成果物retentionは2026-08-24まで（ローカル展開分は影響なし）。**2026-08-20に同ビルドでS3-3(3)とS3-7の実機UATを完了**（viewer `uat-viewer@example-uat.invalid` / admin `uat-admin@example-uat.invalid`）。Stage 3Aの実機UATで残るのはS3-6（AI求人取り込み例外系）のみ。
+- **社内試験運用のWindows展開**: 2026-08-17に**S3-10とBatch 5残UAT（Credential Manager）を実機で完了**。staging QA成果物はDesktop QA artifacts Run `32002806871`（HEAD `0ec8419`）でビルドし、`C:\dev\qa-staging`へ展開・SHA256照合済み。GitHub上の成果物retentionは2026-08-24まで（ローカル展開分は影響なし）。**2026-08-20に同ビルドでS3-3(3)・S3-7・S3-6の実機UATを完了**（viewer `uat-viewer@example-uat.invalid` / admin `uat-admin@example-uat.invalid`）。**Stage 3Aの実機UATはこれで全て完了**し、残るはS3-1（内部利用期間の経過。期間はリリース判断者が定める）のみ。
 
 ---
 
@@ -95,7 +95,7 @@ Fable 5の横断判断で決まった重要事項:
 | S3-1  | ☐    | Stage 2 Go後の内部利用期間の経過待ち（期間はリリース判断者が定める）                                                                                                                                                                                                                                                                                           |
 | S3-3  | ☒ 済 | **2026-08-20完了**。「URL直打ち」方式は2026-08-19にFable 5が撤回し（`docs/fable5-decision-s3-3-2026-08-19.md`）、合格条件は(1)自動テスト7ルート／(2)pgTAP `007_viewer_write_denial.test.sql`／(3)Tauriアプリ内UATの3点へ再定義された。(3)はviewer `uat-viewer@example-uat.invalid` で作成導線・編集導線の不在と閲覧専用バナーを確認し、adminとの対比も取得済み |
 | S3-5  | ☐    | 招待メールフローの実メール確認（Supabase Freeプランはオーナー本人のメールアドレスにしか送信できない制約あり）                                                                                                                                                                                                                                                  |
-| S3-6  | △    | 2026-08-20に入力バリデーション系3シナリオ（不正URLのテキスト貼付／無関係テキスト／空入力）を実機で確認。**残りは不正PDF拒否・パスワード保護PDF拒否・企業重複検知・画面内キャッシュ**（自動テストは済み。PDF系のドラッグ＆ドロップはOS依存のため実機確認が要る）                                                                                                |
+| S3-6  | ☒ 済 | **2026-08-20完了**。入力バリデーション系3シナリオ（不正URL／無関係テキスト／空入力）に加え、不正PDF拒否2種・パスワード保護PDF拒否・企業重複検知・画面内キャッシュを実機で確認（AI実行は計1回）。「同名・同容量でも内容が異なるPDF」のみキャッシュキーの単体テストへ振り替え                                                                                    |
 | S3-7  | ☒ 済 | **2026-08-20完了**。admin `uat-admin@example-uat.invalid` で企業・求人のアーカイブ／復元を実確認。候補者は2026-08-11に確認済みで3エンティティが揃った                                                                                                                                                                                                          |
 | S3-10 | ☒ 済 | 2026-08-17にWindows実機で完了（インストール/起動/セッション復元/最小サイズ制約/アンインストール、資格情報の作成・削除）。Batch 5残UATも同時に消化。staging/production共存のWindows確認のみ未実施                                                                                                                                                               |
 | S3-11 | ☐    | macOSコード署名・Notarization（Apple Developer Program未登録）                                                                                                                                                                                                                                                                                                 |
