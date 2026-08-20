@@ -93,6 +93,8 @@ S3-7（企業・求人の重複警告 / アーカイブ / 復元の実地確認�
 
 未適用migration 7本 + Batch 6A のproduction適用は**このPCでは実行できない**。`supabase db dump` が `pg_dump` をDockerコンテナ内で実行するため、Docker（＝WSL2）が必須だが、**職場PCではWSL2のインストールが管理ポリシーによりブロックされる（403）**。Freeプランで自動バックアップがなく、適用前バックアップが唯一の復旧手段であるため、バックアップなしで適用へ進む選択肢はない。
 
+**2026-08-20に再確認したが状況は変わらず**: `wsl --status` は「Linux 用 Windows サブシステムがインストールされていません」で exit 50、`docker info` は `npipe:////./pipe/dockerDesktopLinuxEngine` へ接続できず exit 1。Docker CLI 本体は存在するが Docker Desktop は未セットアップ（設定キー `HKCU:\SOFTWARE\Docker Inc.\Docker.0` なし・プロセス未起動）で、WSL2 が入らない限り Linux エンジンは起動しない。Windowsオプション機能の状態照会は管理者権限が要るため未実施。
+
 自宅PCでの再開手順は `docs/development-handoff-2026-08-19-home-pc-resume.md` が正本。`git pull --ff-only` だけで最新に追いつく（このPCから持ち出すファイルはない）。
 
 ## 6. 次回このPCで再開する場合の最初のコマンド
