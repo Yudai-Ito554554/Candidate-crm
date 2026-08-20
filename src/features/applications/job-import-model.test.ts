@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import {
   JOB_IMPORT_MAX_PDF_BYTES,
   countExtractedJobFields,
@@ -437,6 +441,51 @@ describe("job import model", () => {
     );
     expect(getJobImportSourceLabel(source)).not.toContain("ref=agent");
     expect(countExtractedJobFields(extracted)).toBe(14);
+  });
+
+  it("keys a PDF by the SHA-256 of its bytes, not by its name or size", async () => {
+    // The two fixtures share a file name and a byte count on purpose. They
+    // stand in for the hardware step this test replaces: a cache keyed on
+    // metadata would collide on them and serve a stale extraction.
+    const variant = (folder: string) =>
+      readFile(
+        path.resolve(
+          process.cwd(),
+          "docs/fixtures",
+          folder,
+          "job-import-cache-variant.pdf",
+        ),
+      );
+    const [a, b] = await Promise.all([
+      variant("cache-variant-a"),
+      variant("cache-variant-b"),
+    ]);
+    const metadata = {
+      type: "application/pdf",
+      lastModified: 1_786_070_000_000,
+    };
+    const first = new File([a], "job-import-cache-variant.pdf", metadata);
+    const second = new File([b], "job-import-cache-variant.pdf", metadata);
+
+    expect(first.name).toBe(second.name);
+    expect(first.size).toBe(second.size);
+
+    const digest = (contents: Buffer) =>
+      `pdf:sha256:${createHash("sha256").update(contents).digest("hex")}`;
+    const [firstKey, secondKey, renamedKey] = await Promise.all([
+      getJobImportSourceKey({ type: "pdf", file: first }),
+      getJobImportSourceKey({ type: "pdf", file: second }),
+      getJobImportSourceKey({
+        type: "pdf",
+        file: new File([a], "renamed.pdf", metadata),
+      }),
+    ]);
+
+    expect(firstKey).toBe(digest(a));
+    expect(secondKey).toBe(digest(b));
+    expect(firstKey).not.toBe(secondKey);
+    // Same bytes under a different name stay one cache entry.
+    expect(renamedKey).toBe(firstKey);
   });
 
   it("distinguishes PDF contents even when file metadata is identical", async () => {
