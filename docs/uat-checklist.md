@@ -58,6 +58,16 @@
 
 架空データの`docs/fixtures/job-import-sample.txt`と`output/pdf/candidate-crm-job-import-sample.pdf`を使用する。実在する求人票や非公開求人ページは、この非本番確認へ使用しない。
 
+例外系は次の架空フィクスチャを使用する（すべて `node scripts/generate-job-import-uat-fixtures.mjs` で再生成できる）。
+
+| ファイル                                                                                                                     | 用途                                                               | 期待される拒否メッセージ                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `docs/fixtures/job-import-fake.pdf`                                                                                          | 拡張子は`.pdf`だが中身はテキスト                                   | PDFの内容を確認できません。正しいPDFファイルを選択してください。               |
+| `docs/fixtures/job-import-truncated.pdf`                                                                                     | `%PDF-`で始まるが`%%EOF`が無い                                     | PDFが壊れているか、読み込みが完了していません。別のPDFを選択してください。     |
+| `docs/fixtures/job-import-password-protected.pdf`                                                                            | 実際にRC4-40で暗号化済み（ユーザーパスワード `uat-test-password`） | パスワード保護されたPDFは読み込めません。保護を解除したPDFを選択してください。 |
+| `docs/fixtures/job-import-company-conflict.txt`                                                                              | 企業名とWebサイトを両方記載し、企業照合の競合を再現する            | （拒否ではなく既存企業の確認案内）                                             |
+| `docs/fixtures/cache-variant-a/job-import-cache-variant.pdf`<br>`docs/fixtures/cache-variant-b/job-import-cache-variant.pdf` | 同名・同容量（1,223バイト）で内容が異なるPDFの組                   | （拒否ではなくキャッシュ誤再利用の検出）                                       |
+
 - テキスト貼り付けで企業名、求人名、事業部、職種、雇用形態、勤務地、年収、募集期間、条件、仕事内容が候補として表示される
 - PDFをファイル選択またはドラッグ＆ドロップし、ファイル名・容量を確認してから同等の項目を読み取れる
 - macOS・WindowsのTauriアプリ双方でPDFのドラッグ＆ドロップが反応する

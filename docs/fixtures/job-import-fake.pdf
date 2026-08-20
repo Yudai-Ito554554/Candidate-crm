@@ -1,0 +1,7 @@
+This file is named .pdf but it is plain text, not a PDF document.
+
+Candidate CRM UAT fixture. It exists to confirm that a file whose
+extension claims PDF is rejected before any AI quota is spent.
+It describes no real company, job, or person.
+
+架空データ。実在する企業・求人とは関係ありません。

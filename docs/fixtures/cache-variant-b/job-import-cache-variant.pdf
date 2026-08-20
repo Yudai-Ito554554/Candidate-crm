@@ -1,0 +1,42 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 596 >>
+stream
+BT /F1 11 Tf 60 760 Td (Candidate CRM - UAT fixture \(fictional\)) Tj ET
+BT /F1 11 Tf 60 742 Td () Tj ET
+BT /F1 11 Tf 60 724 Td (Company: Medical Frontier Inc. \(fictional company\)) Tj ET
+BT /F1 11 Tf 60 706 Td (Job: Orthopaedic medical device sales) Tj ET
+BT /F1 11 Tf 60 688 Td (Location: Tokyo / Osaka) Tj ET
+BT /F1 11 Tf 60 670 Td (Salary: 7,000,000 - 9,500,000 JPY) Tj ET
+BT /F1 11 Tf 60 652 Td () Tj ET
+BT /F1 11 Tf 60 634 Td (This is a fictional job posting written for Candidate CRM acceptance) Tj ET
+BT /F1 11 Tf 60 616 Td (testing. It describes no real company, job, or person.) Tj ET
+
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R /ID [<63616E64696461746563726D75617430> <63616E64696461746563726D75617430>] >>
+startxref
+964
+%%EOF
