@@ -135,6 +135,18 @@ Release Candidate baseline: `91ef650`
 
 **productionへの申し送り**: productionでは fail-closed の再演を行わない（2.12節 項目4はstagingで1回実証すれば足りる）。key設定後は値をパスワードマネージャへ保管し、**再入力が必要な場面自体を作らない**。key削除の不可逆性と運用規則は `docs/backup-runbook.md` 9節が正本。
 
+### production適用記録（2026-08-21、Batch 6A）
+
+- 対象: production `dsaqarejqslzgcatkxeh`（`candidate-crm`）、release commit `3d29c1b28503f0d7f795009a240667f52a268150`。メインリポジトリのstaging link・`.env`は変更せず、隔離workdirだけをproductionへlinkした。
+- 適用前バックアップ: roles / schema / data と適用前列権限基準値を取得し、`.backup-db-ok`を作成。`crm-files`はCLI一覧・`storage.objects`・ダウンロードの3件数がすべて0件で一致し、checksum manifestと`.backup-storage-ok`を作成。今回の正本計画どおりrestore drillは省略した。
+- HMAC key: production専用 `AI_FINGERPRINT_HMAC_KEY_V1` を新規生成し、Windows Credential Managerへ保管してSupabase Edge Function Secretへ設定。控えとSupabase側のsaltなしSHA256 digestが完全一致した。productionではfail-closedを再演せず、このkeyを削除しない。
+- dry-run: 承認済みの7 migrationだけ、seeds 0、roles 0を確認して実施者の承認後に適用。適用後の`migration list --linked`はlocal / remoteとも30本が全行一致し、未適用0。
+- Edge Functions: migration適用後に旧productionソースをロールバック用に退避し、`generate-candidate-summary`と`extract-job-posting`をdeploy。前者はversion 11、後者はversion 18で、両方`ACTIVE` / `verify_jwt: true`を確認した。
+- 適用後SQL: `ai_generation_requests` / `job_import_requests`の5列は各5列存在。既存行はそれぞれ2行 / 1行で、5列が非NULLの既存行は双方0。`profiles`のCHECK制約は`suspended`を許可し、`audit_logs.actor_kind`はNOT NULL。`email_threads`のauthenticated UPDATE列は`archived_at,status`、`files`は`archived_at`だけでStage 1期待値を維持した。
+- Advisor: ERROR / Blockerなし。`ai_generation_requests` / `job_import_requests`の「RLS有効・policyなし」はdesktop clientから全面REVOKEしたserver-only設計に対応するINFO。既存のSECURITY DEFINER関数3件、leaked password protection、unused indexのWARN / INFOは別途既知項目として扱う。
+- production内部検証版: GitHub Actions Run `32449146381`を上記40桁SHAで実行し、Windows / macOSとも全工程成功。Windows成果物のサイズ・SHA256はmanifestと一致した。未署名の社内検証用であり一般配布しない。
+- 本番アプリUAT: **一部完了**。production MSIをWindows実機へインストールし、2026-08-21にユーザー操作でログイン成功を確認した。Windows操作基盤は`failed to start Node runtime: 指定されたパスが見つかりません (os error 3)`で起動せず、自動操作できなかった。ログアウト/再起動後のセッション復元、ホーム、候補者・企業・求人の一覧/詳細、監査ログ、架空求人票によるAI疎通と5列記録は、下記C-1としてWindows実機で実施するまで保留する。
+
 ---
 
 ## B. 推奨項目（どの段階のGoも妨げない）
