@@ -145,7 +145,7 @@ Release Candidate baseline: `91ef650`
 - 適用後SQL: `ai_generation_requests` / `job_import_requests`の5列は各5列存在。既存行はそれぞれ2行 / 1行で、5列が非NULLの既存行は双方0。`profiles`のCHECK制約は`suspended`を許可し、`audit_logs.actor_kind`はNOT NULL。`email_threads`のauthenticated UPDATE列は`archived_at,status`、`files`は`archived_at`だけでStage 1期待値を維持した。
 - Advisor: ERROR / Blockerなし。`ai_generation_requests` / `job_import_requests`の「RLS有効・policyなし」はdesktop clientから全面REVOKEしたserver-only設計に対応するINFO。既存のSECURITY DEFINER関数3件、leaked password protection、unused indexのWARN / INFOは別途既知項目として扱う。
 - production内部検証版: GitHub Actions Run `32449146381`を上記40桁SHAで実行し、Windows / macOSとも全工程成功。Windows成果物のサイズ・SHA256はmanifestと一致した。未署名の社内検証用であり一般配布しない。
-- 本番アプリUAT: **一部完了**。production MSIをWindows実機へインストールし、2026-08-21にユーザー操作でログイン成功を確認した。Windows操作基盤は`failed to start Node runtime: 指定されたパスが見つかりません (os error 3)`で起動せず、自動操作できなかった。ログアウト/再起動後のセッション復元、ホーム、候補者・企業・求人の一覧/詳細、監査ログ、架空求人票によるAI疎通と5列記録は、下記C-1としてWindows実機で実施するまで保留する。
+- 本番アプリUAT: **完了**。production MSIをWindows実機へインストールし、2026-08-21にユーザー操作でログイン/ログアウト、再起動後のセッション復元、ホーム画面、候補者・企業・求人の一覧/詳細、adminでの監査ログ閲覧と直前操作の記録、架空求人票によるAI疎通1回と5列記録を確認した。実在データは入力していない。
 
 ---
 
@@ -164,7 +164,7 @@ Release Candidate baseline: `91ef650`
 
 | #    | 項目                                           | 必要なもの                                                                                                                   | 対象段階                                      | 判断状況                                                                                 |
 | ---- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| C-1  | Windows実機での本番UAT                         | Windows PC                                                                                                                   | Stage 3のみ                                   | 社内の他利用者がWindowsを使用するため、次の最優先項目                                    |
+| C-1  | Windows実機での本番UAT                         | Windows PC                                                                                                                   | Stage 3のみ                                   | 2026-08-21完了。production適用記録に結果を記載                                           |
 | C-2  | macOSコード署名・Notarization                  | Apple Developer Program登録（年額）                                                                                          | Stage 3のみ                                   | macOSは当面オーナー本人だけが使用。外部提供前まで延期                                    |
 | C-3  | Windowsコード署名                              | コード署名証明書（EV推奨）                                                                                                   | Stage 3のみ                                   | 未着手                                                                                   |
 | C-4  | `auth_leaked_password_protection`の有効化      | Supabase Pro Plan以上                                                                                                        | Stage 3で意思決定推奨（Stage 1・2は妨げない） | 社内試験運用はFree継続と決定。外部提供前のPro再判定時に有効化を検討                      |
